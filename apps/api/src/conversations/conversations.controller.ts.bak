@@ -1,4 +1,4 @@
-﻿import { Body, Controller, HttpException, HttpStatus, Post, Get } from '@nestjs/common';
+﻿import { Body, Controller, HttpException, HttpStatus, Post } from "@nestjs/common";
 import { CreateConversationDto } from "./dto/create-conversation.dto";
 
 @Controller("conversations")
@@ -16,5 +16,3 @@ export class ConversationsController {
     );
   }
 }
-
-
