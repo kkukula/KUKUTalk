@@ -1,0 +1,383 @@
+// Prisma schema for KUKUTalk (PostgreSQL by default).
+// Uses env(DATABASE_URL). In dev you can also point it to SQLite if needed.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // change to "sqlite" in dev if preferred
+  url      = env("DATABASE_URL")
+}
+
+/// ===== Enums =====
+
+enum Role {
+  CHILD
+  PARENT
+  TEACHER
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  BLOCKED
+  PENDING
+}
+
+enum GuardianLinkStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  REVOKED
+}
+
+enum ContactStatus {
+  PENDING
+  APPROVED
+  BLOCKED
+}
+
+enum RequestedBy {
+  CHILD
+  PARENT
+  TEACHER
+}
+
+enum ConversationType {
+  DIRECT
+  CLASS
+}
+
+enum ConversationMemberRole {
+  MEMBER
+  OWNER
+}
+
+enum MessageStatus {
+  SENT
+  EDITED
+  DELETED
+  REVIEW
+  BLOCKED
+}
+
+enum ModerationType {
+  PROFANITY
+  VIOLENCE
+  GROOMING
+  SELF_HARM
+  OTHER
+}
+
+enum ModerationSource {
+  RULES
+  ML
+  USER_REPORT
+  ADMIN
+}
+
+enum ModerationStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  ESCALATED
+  BLOCKED
+}
+
+enum ModerationDecision {
+  ALLOW
+  REVIEW
+  BLOCK
+}
+
+enum ClassRole {
+  STUDENT
+  TEACHER
+  ASSISTANT
+}
+
+enum ClassMembershipStatus {
+  INVITED
+  ACTIVE
+  REMOVED
+}
+
+enum ConsentType {
+  TERMS
+  PRIVACY
+  PARENTAL
+  DATA_PROCESSING
+}
+
+enum AuditAction {
+  USER_REGISTER
+  USER_LOGIN
+  CONTACT_REQUEST
+  CONTACT_APPROVE
+  MESSAGE_SEND
+  MESSAGE_EDIT
+  MESSAGE_DELETE
+  MODERATION_DECISION
+  CLASS_CREATE
+  CLASS_JOIN
+  SETTINGS_UPDATE
+  OTHER
+}
+
+enum TaskType {
+  EDU_REMINDER
+  ACCESS_SCHEDULE
+  OTHER
+}
+
+enum TaskStatus {
+  PENDING
+  DONE
+  CANCELLED
+}
+
+/// ===== Models =====
+
+model User {
+  id        String    @id @default(cuid())
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
+
+  // Auth & profile
+  username     String     @unique
+  email        String?    @unique
+  displayName  String
+  passwordHash String
+  role         Role       @default(CHILD)
+  status       UserStatus @default(ACTIVE)
+
+  // Privacy / GDPR minimal: not storing DOB or address in MVP
+  // Consents and audit are tracked in dedicated models
+
+  // Relations
+  childrenLinks GuardianLink[] @relation("ChildLinks")
+  parentLinks   GuardianLink[] @relation("ParentLinks")
+
+  ownedContacts Contact[] @relation("OwnerContacts")
+  contactOf     Contact[] @relation("ContactUsers")
+
+  conversations ConversationMember[]
+  messages      Message[]
+  moderationBy  ModerationFlag[]     @relation("ResolvedBy")
+
+  classroomsLead   Classroom[]       @relation("TeacherClassrooms")
+  classMemberships ClassMembership[]
+
+  consentLogs ConsentLog[]
+  auditLogs   AuditLog[]   @relation("ActorLogs")
+  auditTarget AuditLog[]   @relation("TargetUserLogs")
+
+  tasks Task[]
+
+  createdConversations Conversation[] @relation(name: "UserCreatedConversations")
+
+  @@index([role])
+  @@index([status])
+}
+
+model GuardianLink {
+  id        String             @id @default(cuid())
+  createdAt DateTime           @default(now())
+  decidedAt DateTime?
+  status    GuardianLinkStatus @default(PENDING)
+
+  childId  String
+  parentId String
+
+  child  User @relation("ChildLinks", fields: [childId], references: [id], onDelete: Cascade)
+  parent User @relation("ParentLinks", fields: [parentId], references: [id], onDelete: Cascade)
+
+  @@unique([childId, parentId])
+  @@index([status])
+}
+
+model Contact {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  ownerId            String // the child owner of the contact list
+  contactUserId      String // the user being added (child/teacher/etc)
+  status             ContactStatus @default(PENDING)
+  requestedBy        RequestedBy   @default(CHILD)
+  approvedByParentId String?
+  approvedAt         DateTime?
+
+  owner       User @relation("OwnerContacts", fields: [ownerId], references: [id], onDelete: Cascade)
+  contactUser User @relation("ContactUsers", fields: [contactUserId], references: [id], onDelete: Cascade)
+
+  @@unique([ownerId, contactUserId])
+  @@index([ownerId])
+  @@index([status])
+}
+
+model Conversation {
+  id          String           @id @default(cuid())
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  archivedAt  DateTime?
+  type        ConversationType
+  createdById String?
+  createdBy   User?            @relation(name: "UserCreatedConversations", fields: [createdById], references: [id], onDelete: SetNull)
+
+  // For class chats, link to Classroom
+  classroomId String?    @unique
+  classroom   Classroom? @relation(fields: [classroomId], references: [id], onDelete: SetNull)
+
+  members       ConversationMember[]
+  messages      Message[]
+  lastMessageAt DateTime?
+
+  @@index([type])
+  @@index([classroomId])
+  @@index([lastMessageAt])
+}
+
+model ConversationMember {
+  conversationId String
+  userId         String
+  role           ConversationMemberRole @default(MEMBER)
+  joinedAt       DateTime               @default(now())
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([conversationId, userId])
+  @@index([userId])
+}
+
+model Message {
+  id        String        @id @default(cuid())
+  createdAt DateTime      @default(now())
+  editedAt  DateTime?
+  deletedAt DateTime?
+  status    MessageStatus @default(SENT)
+
+  conversationId String
+  senderId       String
+  content        String
+  attachmentUrl  String?
+
+  conversation Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User             @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  flags        ModerationFlag[]
+
+  @@index([conversationId, createdAt])
+  @@index([senderId, createdAt])
+}
+
+model ModerationFlag {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  messageId String?
+  message   Message? @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  type     ModerationType      @map("type")
+  source   ModerationSource
+  status   ModerationStatus    @default(OPEN)
+  decision ModerationDecision? // ALLOW/REVIEW/BLOCK as final action
+
+  scores Json? // e.g. {"profanity":0.82,"violence":0.05}
+  reason String?
+
+  resolvedById String?
+  resolvedBy   User?     @relation("ResolvedBy", fields: [resolvedById], references: [id], onDelete: SetNull)
+  resolvedAt   DateTime?
+
+  @@index([status])
+  @@index([messageId])
+}
+
+model Classroom {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  name       String
+  inviteCode String? @unique
+  teacherId  String
+  teacher    User    @relation("TeacherClassrooms", fields: [teacherId], references: [id], onDelete: Cascade)
+
+  memberships  ClassMembership[]
+  conversation Conversation?
+
+  @@index([teacherId])
+}
+
+model ClassMembership {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  classroomId String
+  userId      String
+  role        ClassRole             @default(STUDENT)
+  status      ClassMembershipStatus @default(ACTIVE)
+
+  classroom Classroom @relation(fields: [classroomId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([classroomId, userId])
+  @@index([userId])
+}
+
+model ConsentLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  type      ConsentType @map("type")
+  granted   Boolean
+  ip        String?
+  userAgent String?
+  meta      Json?
+
+  @@index([userId, type])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  actorId String?
+  actor   User?   @relation("ActorLogs", fields: [actorId], references: [id], onDelete: SetNull)
+
+  targetUserId String?
+  targetUser   User?   @relation("TargetUserLogs", fields: [targetUserId], references: [id], onDelete: SetNull)
+
+  action    AuditAction
+  ip        String?
+  userAgent String?
+  meta      Json?
+
+  @@index([createdAt])
+  @@index([action])
+}
+
+model Task {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  title       String
+  description String?
+  type        TaskType   @default(EDU_REMINDER) @map("type")
+  status      TaskStatus @default(PENDING)
+  dueAt       DateTime?
+  completedAt DateTime?
+}

@@ -1,0 +1,74 @@
+# --- baza --- 
+FROM node:20-alpine3.19 AS base
+WORKDIR /app
+
+# krytyczne: libssl 1.1 dla Prisma (musl)
+RUN apk add --no-cache openssl1.1-compat
+
+# reszta jak u Ciebie:
+COPY package.json pnpm-lock.yaml ./
+RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN pnpm install --frozen-lockfile
+
+COPY . .
+RUN pnpm --filter @kukutalk/api exec prisma generate
+
+CMD ["pnpm","--filter","@kukutalk/api","run","start"]
+
+# ===== Stage: deps (build) =====
+FROM node:20-alpine AS deps
+WORKDIR /repo
+
+# OpenSSL 3 dla Prisma (Alpine/musl) + toolchain do bcrypt
+RUN apk add --no-cache libssl3 libcrypto3 python3 make g++
+
+ENV PRISMA_FORCE_LIBSSL3=1
+ENV PRISMA_CLIENT_ENGINE_TYPE=library
+
+RUN corepack enable
+
+# 1) Meta monorepo + package.json API
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml turbo.json ./
+COPY apps/api/package.json ./apps/api/package.json
+
+# 2) Wstępnie dostarcz schemat (do obu lokalizacji)
+COPY infra/prisma/schema.prisma ./infra/prisma/schema.prisma
+COPY infra/prisma/schema.prisma ./apps/api/infra/prisma/schema.prisma
+
+# 3) Instalacja (bez frozen lockfile – szybkie odblokowanie)
+RUN pnpm install --no-frozen-lockfile
+
+# 4) Reszta źródeł
+COPY apps ./apps
+COPY infra/prisma ./infra/prisma
+
+# Nadpisz schema w apps/api (jeśli były zmiany)
+RUN mkdir -p apps/api/infra/prisma \
+ && cp -f infra/prisma/schema.prisma apps/api/infra/prisma/schema.prisma
+
+# 5) Prisma Client przed TS
+RUN pnpm --filter @kukutalk/api exec prisma generate --schema infra/prisma/schema.prisma
+
+# 6) Build TS -> dist
+RUN pnpm --filter @kukutalk/api run build
+
+# 7) Prune do prod
+RUN pnpm deploy --filter @kukutalk/api --prod /opt/api
+
+
+# ===== Stage: runner =====
+FROM node:20-alpine AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN apk add --no-cache libssl3 libcrypto3
+
+COPY --from=deps /opt/api/ ./
+COPY infra/prisma/schema.prisma ./infra/prisma/schema.prisma
+
+ENV PRISMA_FORCE_LIBSSL3=1
+ENV PRISMA_CLIENT_ENGINE_TYPE=library
+
+# Dociągnięcie binarek Prisma kompatybilnych z musl/OpenSSL3
+RUN npx --yes prisma@5.22.0 generate --schema=infra/prisma/schema.prisma
+
+CMD ["node", "dist/main.js"]

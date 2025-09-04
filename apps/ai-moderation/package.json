@@ -1,0 +1,24 @@
+{
+  "name": "@kukutalk/ai-moderation",
+  "version": "0.1.0",
+  "private": true,
+  "description": "AI Moderation stub microservice (Express + TypeScript). Endpoint: POST /classify",
+  "scripts": {
+    "start": "node dist/index.js",
+    "start:dev": "ts-node src/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" --max-warnings=0 || true",
+    "test": "echo \"(stub)\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.21",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.4"
+  }
+}

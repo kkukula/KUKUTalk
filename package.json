@@ -1,0 +1,30 @@
+{
+  "name": "kukutalk",
+  "private": true,
+  "version": "0.1.0",
+  "description": "KUKUTalk monorepo (apps: api, web, ai-moderation, ai-tutor)",
+  "packageManager": "pnpm@9.6.0",
+  "scripts": {
+    "dev": "turbo run dev --parallel",
+    "build": "turbo run build",
+    "lint": "turbo run lint",
+    "test": "turbo run test",
+    "test:e2e": "turbo run test:e2e",
+    "prisma:generate": "prisma generate --schema=infra/prisma/schema.prisma",
+    "prisma:migrate:dev": "prisma migrate dev --schema=infra/prisma/schema.prisma",
+    "prisma:migrate:deploy": "prisma migrate deploy --schema=infra/prisma/schema.prisma",
+    "prisma:seed": "ts-node --transpile-only infra/prisma/seed.ts",
+    "docker:up": "docker compose -f infra/docker/docker-compose.yml up -d --build",
+    "docker:down": "docker compose -f infra/docker/docker-compose.yml down -v"
+  },
+  "devDependencies": {
+    "prettier": "^3.3.2",
+    "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
+    "turbo": "^1.13.3",
+    "typescript": "^5.5.4"
+  },
+  "dependencies": {
+    "passport-jwt": "^4.0.1"
+  }
+}

@@ -1,0 +1,61 @@
+# FILES_TO_GENERATE.md — Struktura monorepo do wygenerowania
+
+```
+kukutalk/
+  apps/
+    api/
+      src/
+        main.ts
+        app.module.ts
+        modules/
+          auth/
+          users/
+          contacts/
+          conversations/
+          messages/
+          moderation/
+          classrooms/
+          parent/
+        websockets/
+        common/
+      prisma/
+        schema.prisma
+        seed.ts
+      test/
+      package.json
+      tsconfig.json
+      .env.example
+    web/
+      app/
+        (routes, layouts, pages)
+      components/
+      lib/
+      public/
+      package.json
+      next.config.ts
+      .env.example
+    ai-moderation/
+      README.md
+      package.json
+    ai-tutor/
+      README.md
+      package.json
+  packages/
+    shared-types/
+      src/
+      package.json
+    ui/ (opcjonalnie)
+  infra/
+    docker/
+      Dockerfile.api
+      Dockerfile.web
+      docker-compose.yml
+    prisma/
+      migrations/
+  .github/workflows/lint-test-build.yml
+  README.md
+  INSTALL.md
+  SECURITY.md
+  PRIVACY.md
+```
+> To jest docelowa struktura, którą powinien wytworzyć ChatGPT na podstawie `SUPERPROMPT.md`. Ten pakiet nie zawiera żadnego z powyższych plików — to tylko specyfikacja.

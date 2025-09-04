@@ -1,0 +1,69 @@
+# Node / pnpm
+node_modules/
+dist/
+.cache/
+.tmp/
+.temp/
+.nyc_output/
+coverage/
+*.log
+pnpm-debug.log*
+turbo/
+.vscode/
+.idea/
+
+# Prisma
+/apps/api/prisma/dev.db
+/apps/api/prisma/.env
+# migracje CHCEMY commitować, więc nie ignoruj folderu migrations
+
+# Env/secrets
+.env
+.env.*
+apps/*/.env
+infra/*/.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+**/.dockerignore
+
+# --- KUKUTalk defaults ---
+# Node / pnpm / Turbo
+node_modules/
+.pnpm-store/
+.pnpm-debug.log*
+.npmrc
+.turbo/
+dist/
+build/
+out/
+coverage/
+.next/
+.cache/
+.tmp/
+temp/
+tmp/
+
+# Logs
+*.log
+logs/
+
+# Env / secrets
+.env
+.env.*
+apps/**/.env
+infra/**/.env
+
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Docker
+**/.dockerignore
+
+# Prisma
+prisma/dev.db
+**/dev.db

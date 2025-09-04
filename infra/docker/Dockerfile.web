@@ -1,0 +1,22 @@
+# syntax=docker/dockerfile:1.6
+FROM node:20-alpine AS base
+RUN corepack enable
+
+FROM base AS deps
+WORKDIR /repo
+COPY package.json pnpm-workspace.yaml turbo.json pnpm-lock.yaml ./
+RUN corepack enable && pnpm install --frozen-lockfile
+COPY package.json pnpm-workspace.yaml turbo.json pnpm-lock.yaml ./
+COPY apps ./apps
+# COPY packages ./packages
+RUN pnpm install --frozen-lockfile
+RUN pnpm --filter @kukutalk/web build
+RUN pnpm deploy --filter @kukutalk/web --prod /opt/web
+
+FROM base AS runner
+ENV NODE_ENV=production \
+    PORT=3000
+WORKDIR /app
+COPY --from=deps /opt/web/ /app/
+EXPOSE 3000
+CMD ["npm","run","start"]

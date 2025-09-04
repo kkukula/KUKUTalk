@@ -1,0 +1,17 @@
+{
+  "app.title": "KUKUTalk",
+  "auth.signIn": "Sign in",
+  "auth.username": "Username",
+  "auth.password": "Password",
+  "auth.login": "Log in",
+  "auth.logout": "Log out",
+  "nav.chat": "Chat",
+  "nav.dashboard": "Dashboard",
+  "nav.classrooms": "Classroom",
+  "chat.contacts": "Contacts",
+  "chat.typeMessage": "Type a message…",
+  "chat.send": "Send",
+  "parent.pending": "Contact requests",
+  "parent.alerts": "Alerts",
+  "teacher.classroom": "My classroom"
+}
