@@ -1,0 +1,112 @@
+﻿name: docker
+services:
+  api:
+    build:
+      context: C:\projekty\KUKUTalk
+      dockerfile: infra/docker/api.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+        required: true
+      redis:
+        condition: service_started
+        required: true
+    environment:
+      DATABASE_URL: postgresql://kukutalk:kukutalk@postgres:5432/kukutalk?schema=public
+      JWT_EXPIRES_IN: 1d
+      JWT_SECRET: devsecret
+      NODE_ENV: production
+      PORT: "3001"
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 3001
+        published: "3001"
+        protocol: tcp
+    restart: unless-stopped
+  guard:
+    build:
+      context: C:\projekty\KUKUTalk\infra\docker\guard
+      dockerfile: Dockerfile
+    depends_on:
+      api:
+        condition: service_started
+        required: true
+    environment:
+      TARGET: http://api:3001
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 3000
+        published: "3002"
+        protocol: tcp
+    restart: unless-stopped
+  mailhog:
+    image: mailhog/mailhog
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 1025
+        published: "1025"
+        protocol: tcp
+      - mode: ingress
+        target: 8025
+        published: "8025"
+        protocol: tcp
+    restart: unless-stopped
+  postgres:
+    environment:
+      POSTGRES_DB: kukutalk
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - pg_isready -U postgres -d kukutalk
+      timeout: 5s
+      interval: 5s
+      retries: 20
+    image: postgres:16
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 5432
+        published: "5432"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: pgdata
+        target: /var/lib/postgresql/data
+        volume: {}
+  redis:
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+    image: redis:7-alpine
+    networks:
+      default: null
+    ports:
+      - mode: ingress
+        target: 6379
+        published: "6379"
+        protocol: tcp
+    restart: unless-stopped
+    volumes:
+      - type: volume
+        source: redisdata
+        target: /data
+        volume: {}
+networks:
+  default:
+    name: docker_default
+volumes:
+  pgdata:
+    name: docker_pgdata
+  redisdata:
+    name: docker_redisdata

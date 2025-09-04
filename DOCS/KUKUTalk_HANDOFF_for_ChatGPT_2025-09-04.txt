@@ -1,0 +1,58 @@
+KUKUTalk — Handoff for ChatGPT (as of 2025-09-04)
+
+Goal
+- Build a safe chat for children with moderation and guardian oversight.
+
+Current State (works end-to-end)
+- Auth: /auth/login, /auth/refresh, /auth/logout, /auth/me
+- Conversations: GET /conversations
+- Messages: GET /conversations/:id/messages, POST /conversations/:id/messages
+- Guard service (proxy at :3002): moderation + 5/10s rate-limit per user×conversation
+
+Key Gaps to implement next
+1) POST /conversations with membership (OWNER) and validation
+2) Enforce membership on message send/list
+3) Server-side ModerationService → set message.status (SENT/FLAGGED/BLOCKED), persist ModerationFlag, include moderation {decision, reason}
+4) Role-based access control (CHILD/GUARDIAN/TEACHER)
+5) WebSocket events (message:new)
+
+How to run (local)
+- Base stack:
+  docker compose -f infra/docker/docker-compose.yml up -d --build
+- Guard (override):
+  docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.guard.yml up -d --build guard
+
+Smoke login via guard (PowerShell)
+  $b=@{username="dev1";password="Passw0rd!"}|ConvertTo-Json
+  $t=(iwr http://localhost:3002/auth/login -Method POST -ContentType "application/json" -Body $b).Content|ConvertFrom-Json
+  iwr http://localhost:3002/auth/me -Headers @{Authorization="Bearer $($t.accessToken)"}
+
+Send message (replace <ID>)
+  $p=@{content="Hello from handoff"}|ConvertTo-Json
+  iwr ("http://localhost:3002/conversations/{0}/messages" -f "<ID>") -Method POST -ContentType "application/json" -Headers @{Authorization="Bearer $($t.accessToken)"} -Body $p
+
+Rate-limit quick test (expect 5×SENT + 2×HTTP 429)
+  for ($i=1; $i -le 7; $i++) {
+    $p=@{content="RL $i"}|ConvertTo-Json
+    try {
+      (iwr ("http://localhost:3002/conversations/{0}/messages" -f "<ID>") -Method POST -ContentType "application/json" -Headers @{Authorization="Bearer $($t.accessToken)"} -Body $p).StatusCode
+    } catch { $_.Exception.Response.StatusCode.value__ }
+    Start-Sleep -Milliseconds 120
+  }
+
+PowerShell gotchas
+- Disable Expect:100-continue in the session; do NOT force Connection: close; use -DisableKeepAlive if available.
+
+Deliverables expected in next chat
+- Implement POST /conversations
+- Add membership enforcement
+- Add ModerationService in API with persistence
+- Minimal tests for the above + update Swagger
+- Keep guard as additional safety layer (can remain enabled on :3002)
+
+Artifacts from previous session
+- Guard service code at infra/docker/guard (Dockerfile + server.js)
+- Support bundle zip created on user's machine (paths were printed in-session)
+- DB already migrated; temporary conversation seeding was done via Prisma in dev
+
+Thanks!

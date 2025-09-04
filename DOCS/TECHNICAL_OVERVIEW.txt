@@ -1,259 +1,79 @@
-﻿KUKUTalk  Technical Overview (single-file notes for ChatGPT)
-============================================================
+KUKUTalk — Technical Overview (updated 2025-09-04)
 
 Purpose
--------
-KUKUTalk is a small, monorepo-style app for safe messaging in a school/guardian context:
-- Backend (NestJS) with REST + WebSocket, auth via JWT, PostgreSQL via Prisma, Redis for refresh-token whitelist.
-- Frontend (Vite + React) consuming the API.
-- Dockerized Postgres/Redis/API for reproducible dev.
+- Safe chat for children (role CHILD) with moderation and guardian/school oversight.
 
-Repository (public read)
-------------------------
-GitHub: https://github.com/kkukula/KUKUTalk
+Architecture
+- Backend: NestJS + Prisma (PostgreSQL), Redis for refresh token whitelist
+- Frontend: React/Vite (apps/web)
+- Runtime: Docker Compose
+- Services: postgres, redis, api, guard (reverse-proxy with moderation + rate-limit)
 
-When helping with this project, ASSUME code is available there. Prefer reading files directly in this repo.
+Auth (E2E working)
+- Endpoints: POST /auth/login, POST /auth/refresh, POST /auth/logout, GET /auth/me
+- AccessToken (JWT) + RefreshToken (rotating); refresh tokens validated against Redis
+- Redis URL (in containers): redis://redis:6379/0
 
-Tech stack
-----------
-- Node 20, pnpm workspaces, TypeScript
-- Backend: NestJS 10, Passport JWT, Prisma 5.x, PostgreSQL 16, Redis (ioredis)
-- Frontend: Vite 5, React 18, TS
-- Docker Compose (infra/docker)
+Conversations & Messages (current)
+- GET /conversations → ok
+- GET /conversations/:id/messages → ok
+- POST /conversations/:id/messages → ok (requires membership once enforced)
+- POST /conversations → not implemented yet (temporary seeding via Prisma in dev)
+- Minimal required Conversation fields (deduced from DMMF in dev): createdById, type ('DIRECT' works); name/title is not part of schema (server derives display elsewhere)
 
-How to collaborate with ChatGPT (very important)
-------------------------------------------------
-- Respond with EXACTLY ONE PowerShell command per step when asked for step-by-step guidance.
-- Do not ask the user to wait or give time estimates  return the command in the same message.
-- Prefer idempotent commands. For potentially destructive actions (db drop/restore), explain briefly in comments inside the command (with backticks continuation), or use safeguards (`--if-exists`, `-WhatIf` when possible).
-- Use environment variables and .env.example templates; never echo secrets into chat. If a secret is needed, write the command to prompt or point to the .env file to edit.
-- If a bug is likely caused by module wiring, print a read-only command (Select-String/Get-Content) to show the problematic file portion first, THEN give the fix in another single command (on the next step).
+Guard service (moderation & rate-limit)
+- Location: infra/docker/guard
+- Exposed on host: http://localhost:3002 (proxy to api:3001)
+- ENV: TARGET=http://api:3001, RL_MAX=5, RL_WIN=10000 (ms)
+- Rules (Polish heuristics):
+  • PII_PHONE, MEETUP_RISK → BLOCKED (synthetic response, nothing hits API)
+  • BULLYING → FLAGGED (request forwarded; response status forced to FLAGGED)
+- Rate-limit: 5 messages / 10s per (user×conversation). Excess → HTTP 429 (tests map to RATE_LIMITED).
 
-Monorepo layout (top-level)
----------------------------
-/apps
-  /api        NestJS backend service
-  /web        Vite/React frontend
-/infra
-  /docker     Docker Compose stack (Postgres, Redis, API)
-/prisma?      (Prisma schema is under apps/api/infra/prisma/schema.prisma)
-/backups      (local dir for pg_dump backups; ignored by git)
-/docs         (this file may live here)
-/package.json pnpm-workspace root
-/pnpm-workspace.yaml
-/pnpm-lock.yaml
-/.gitignore   ignores node_modules, .env, backups, etc.
+Dev / Ops
+- Compose base stack:
+  docker compose -f infra/docker/docker-compose.yml up -d --build
+- Guard with override:
+  docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.guard.yml up -d --build guard
+- PowerShell Invoke-WebRequest gotchas:
+  • Disable Expect: 100-continue in session
+  • Do not force 'Connection: close' header; optionally use -DisableKeepAlive if available
+- Backups (pit stop):
+  pg_dump custom format to /backups/pg; backups ignored by git
+- Support bundle: packaged logs/config for handoff; latest zip captured at creation time in user's workspace
 
-Backend (apps/api)
-------------------
-Entry points and modules youll open frequently:
+Known gaps / next
+- Missing POST /conversations (create) with membership handling
+- Membership enforcement on send/list
+- Moderation in API (persist ModerationFlag, message.status)
+- Frontend flows (auth, conversations, chat UI, badges for FLAGGED/BLOCKED)
+- Optional: Prisma v6 upgrade after MVP stabilizes
 
-- src/app.module.ts
-  Root Nest module. Imports:
-   - AuthModule  authentication (JWT)
-   - PrismaModule  DI provider for PrismaService (global-ish provider container)
-   - JwtModule.register({...})  used by controllers/services that sign/verify tokens
-  Declares:
-   - Controllers: ConversationsController
-   - Providers: MessagesService, ModerationService, ChatGateway (WebSocket gateway)
+Plan (high-level)
+A) API
+  1. POST /conversations {type, name?, participantIds?} + auto-membership (OWNER)
+  2. Enforce membership on send/list
+  3. ModerationService in API → persist flags, status SENT/FLAGGED/BLOCKED, return moderation payload
+  4. Role-based access (CHILD, GUARDIAN, TEACHER/ADMIN)
+  5. WebSocket events (message:new with status/moderation)
+B) Frontend
+  6. Auth flow + token refresh; central 401 handling
+  7. Chat UI (list, thread, composer) + visual states for FLAGGED/BLOCKED; sockets
+  8. Guardian lite panel (list of flags)
+C) Quality/OPS
+  9. CI (pnpm -w install, prisma generate, build, tests)
+ 10. Tests: unit/integration (supertest), E2E (Playwright), contract snapshots
+ 11. Seed & migrations hygiene
+ 12. Backups + restore runbook
+D) Security & Privacy
+ 13. Guard++: stronger PII, meeting heuristics, school-hours policy
+ 14. API hardening: rate-limits, CORS, security headers, incident logs
+ 15. Prisma v6 upgrade after MVP
+E) Docs/DX
+ 16. README Quickstart
+ 17. Swagger export + Postman/Insomnia collection
+ 18. Support bundle script polish
 
-- src/prisma/prisma.module.ts
-  @Module({ providers: [PrismaService], exports: [PrismaService] })
-  Provides PrismaService for DI across modules. Import PrismaModule wherever PrismaService is needed.
-  NOTE: Do NOT create duplicate PrismaService files elsewhere  keep a single source of truth here.
-
-- src/prisma/prisma.service.ts
-  Thin wrapper around PrismaClient with clean connect/disconnect lifecycle. Inject this in services.
-
-- src/auth/auth.module.ts
-  Wires PassportModule + JwtModule + UsersModule + PrismaModule.
-  Providers:
-   - AuthService  login/register/refresh/logout
-   - JwtAccessStrategy  passport-jwt strategy named 'jwt' (Bearer tokens)
-   - JwtRefreshStrategy  strategy named 'jwt-refresh' (not used as guard by default)
-  Controllers:
-   - AuthController  REST endpoints (/auth/register, /auth/login, /auth/me, /auth/refresh, /auth/logout)
-
-- src/auth/auth.service.ts
-  Core auth flows:
-   - register(): hashes password (bcrypt), creates user, issues {access, refresh} JWT
-   - login(): validates credentials, issues tokens
-   - refresh(): verifies refresh token (JwtService + REFRESH_SECRET), checks Redis whitelist by jti, rotates tokens
-   - logout(): deletes refresh jti key in Redis (revocation of that refresh token)
-  Important constants via env:
-   - JWT_ACCESS_SECRET, JWT_REFRESH_SECRET
-   - JWT_ACCESS_EXPIRES_IN (e.g., 15m), JWT_REFRESH_EXPIRES_IN (e.g., 7d)
-   - REDIS_URL (in Docker use redis://redis:6379/0; locally may be redis://localhost:6379/0)
-
-- src/auth/jwt-access.strategy.ts
-  PassportStrategy(Strategy, 'jwt'), ExtractJwt.fromAuthHeaderAsBearerToken()
-  Validates access tokens. validate(payload) attaches { userId, username, role } to req.user.
-
-- src/auth/jwt-refresh.strategy.ts
-  PassportStrategy(Strategy, 'jwt-refresh'). Not necessarily used by a guard right now (refresh is explicit via body).
-
-- src/auth/guards/jwt-auth.guard.ts
-  `export class JwtAuthGuard extends AuthGuard('jwt') {}`
-  Use with @UseGuards(JwtAuthGuard) on protected routes.
-
-- src/users/users.module.ts
-  Imports PrismaModule. Provides UsersService; exposes endpoints via UsersController.
-
-- src/users/users.service.ts
-  findById(id) and me(userId)  simple Prisma queries that select id, username, displayName, role, timestamps.
-
-- src/users/users.controller.ts
-  Endpoints:
-   - GET /users/me  requires JwtAuthGuard; returns current user
-   - GET /users/:id  basic user lookup
-
-- src/conversations/conversations.controller.ts
-  Decorated with @UseGuards(JwtAuthGuard). Endpoints:
-   - GET /conversations  lists conversations for req.user.userId
-   - GET /conversations/:id/messages?cursor&take  paginated fetch (checks membership)
-   - POST /conversations/:id/messages {content}  create message (checks membership)
-  Relies on MessagesService and PrismaService. Uses conversation.members relation in the Prisma schema.
-
-- src/conversations/messages.service.ts
-  Helper for listing and creating messages (cursor pagination into Message table). Emits WebSocket events via ChatGateway (if applicable).
-
-- src/conversations/chat.gateway.ts
-  WebSocket gateway (Socket.IO). Subscribes to messages:
-   - "conversation:join"  join channel/room
-   - "message:send"  broadcast messages to conversation room
-  Uses JwtModule in module imports to verify tokens for WS handshake if needed.
-
-- src/moderation/moderation.service.ts
-  Placeholder for moderation logic (scoring/flags). Can be wired to emit ModerationFlag entries into DB or external service.
-
-- src/infra/prisma/schema.prisma (actually: apps/api/infra/prisma/schema.prisma)
-  Prisma data model. From the dump, present tables include:
-   - User, Conversation, ConversationMember, Message, Contact, Classroom, ClassMembership,
-     ConsentLog, AuditLog, GuardianLink, ModerationFlag, Task, _prisma_migrations
-  Enums seen in dump: AuditAction, ClassMembershipStatus, ClassRole, ConsentType, ContactStatus,
-  ConversationMemberRole, ConversationType, GuardianLinkStatus, MessageStatus, ModerationDecision,
-  ModerationSource, ModerationStatus, ModerationType, RequestedBy, Role, TaskStatus, TaskType, UserStatus
-
-Frontend (apps/web)
--------------------
-- index.html / vite config  standard Vite app entry.
-- src/api.ts  small fetch wrapper for API calls; stores accessToken in localStorage.
-  Helpers (expected):
-   - getToken(), setUnauthorizedHandler(fn), getUnauthorizedHandler(), clearToken()
-- src/App.tsx  top-level routing/views.
-- src/Nav.tsx  navigation; imports { clearToken, getToken } to manage session UI.
-
-Infrastructure (infra/docker)
------------------------------
-- docker-compose.yml (service names may be: postgres, redis, api)
-- .env.example (infra/docker/.env.example) with:
-   POSTGRES_USER=kukutalk
-   POSTGRES_PASSWORD=password
-   POSTGRES_DB=kukutalk
-
-Configuration (.env)  samples
-------------------------------
-apps/api/.env.example
----------------------
-DATABASE_URL=postgresql://kukutalk:password@postgres:5432/kukutalk?schema=public
-PORT=3001
-NODE_ENV=development
-JWT_ACCESS_SECRET=change_me_access
-JWT_REFRESH_SECRET=change_me_refresh
-JWT_ACCESS_EXPIRES_IN=15m
-JWT_REFRESH_EXPIRES_IN=7d
-REDIS_URL=redis://redis:6379/0
-
-apps/web/.env.example
----------------------
-VITE_API_URL=http://localhost:3001
-
-Running locally (minimal)
--------------------------
-1) Start Docker stack (Postgres, Redis, API):
-   PowerShell (one-liner):
-   docker compose -f C:\projekty\KUKUTalk\infra\docker\docker-compose.yml up -d --build
-
-2) Start frontend (Vite dev server):
-   pnpm -C C:\projekty\KUKUTalk\apps\web dev
-
-3) Test API quickly (register user):
-   $body=@{ username="dev1"; password="Passw0rd!"; displayName="Dev One" }|ConvertTo-Json
-   iwr -Method POST -Uri http://localhost:3001/auth/register -ContentType "application/json" -Body $body
-
-4) Call protected endpoint:
-   $token = (iwr http://localhost:3001/auth/login -Method POST -ContentType "application/json" -Body '{"username":"dev1","password":"Passw0rd!"}').Content | ConvertFrom-Json
-   iwr http://localhost:3001/auth/me -Headers @{ Authorization="Bearer $($token.accessToken)" }
-
-Common endpoints
-----------------
-- POST /auth/register {username, password, displayName, [email], [role]}
-- POST /auth/login {username, password} -> { accessToken, refreshToken }
-- GET  /auth/me (Bearer accessToken)
-- POST /auth/refresh { refreshToken } -> rotated tokens
-- POST /auth/logout { refreshToken } -> revokes refresh jti
-
-- GET  /conversations (Bearer) -> items[]
-- GET  /conversations/:id/messages?cursor&take (Bearer)
-- POST /conversations/:id/messages {content} (Bearer)
-
-Known gotchas & fixes
----------------------
-- "Unknown authentication strategy 'jwt'":
-  Cause: JwtAccessStrategy not registered or AuthModule not imported into AppModule.
-  Fix: Ensure AuthModule is imported in src/app.module.ts and JwtAccessStrategy is provided in AuthModule.
-
-- "Nest can't resolve PrismaService ...":
-  Cause: PrismaService not visible in module DI.
-  Fix: Provide PrismaService via PrismaModule and import PrismaModule in any module that needs PrismaService (AuthModule, UsersModule, etc.). Do NOT keep duplicate prisma.service.ts in multiple folders.
-
-- Redis ECONNREFUSED inside container:
-  Cause: Using redis://localhost:6379 inside container.
-  Fix: In Docker, use REDIS_URL=redis://redis:6379/0 (service name, not localhost).
-
-- Web build error "No matching export ... setUnauthorizedHandler / clearToken":
-  Cause: api.ts missing helpers.
-  Fix: Add the exported helpers or import correct names. Avoid duplicating function names.
-
-Backup & Restore (Postgres, Docker)
------------------------------------
-Create backup (custom format, compressed):
-$ts = Get-Date -Format "yyyyMMdd_HHmmss"; $dump="pg_kukutalk_$ts.backup"; docker exec docker-postgres-1 pg_dump -U kukutalk -d kukutalk -F c -Z 9 -f "/tmp/$dump"; docker cp docker-postgres-1:/tmp/$dump "C:\projekty\KUKUTalk\backups\$dump"; docker exec docker-postgres-1 rm "/tmp/$dump"
-
-List TOC of a backup (read-only):
-$backupDir="C:\projekty\KUKUTalk\backups"; $dump="<FILE>"; $leaf=Split-Path (Join-Path $backupDir $dump) -Leaf; docker run --rm -v "${backupDir}:/bkp" postgres:16 pg_restore -l "/bkp/$leaf" | Select-Object -First 40
-
-Restore into clean test DB:
-$dump="<FILE>"; docker cp "C:\projekty\KUKUTalk\backups\$dump" docker-postgres-1:/tmp/$dump; docker exec docker-postgres-1 bash -lc "dropdb -U kukutalk --if-exists kukutalk_restorecheck && createdb -U kukutalk kukutalk_restorecheck && pg_restore -U kukutalk -d kukutalk_restorecheck --clean --if-exists -j 4 /tmp/$dump"
-
-Verify restore:
-docker exec docker-postgres-1 psql -U kukutalk -d kukutalk_restorecheck -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';"
-docker exec docker-postgres-1 psql -U kukutalk -d kukutalk_restorecheck -c "SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename='User';"
-docker exec docker-postgres-1 psql -U kukutalk -d kukutalk_restorecheck -c "SELECT typname FROM pg_type t JOIN pg_namespace n ON n.oid=t.typnamespace WHERE n.nspname='public' AND typtype='e' ORDER BY 1;"
-
-Security notes
---------------
-- Never commit .env files; use .env.example templates.
-- Keep JWT secrets and DB passwords in local .env or Docker secrets.
-- Use role-based checks server-side (payload.role); guards should enforce access.
-
-Coding conventions
-------------------
-- Keep a single PrismaModule/PrismaService.
-- Feature modules import PrismaModule as needed.
-- Guards via @UseGuards(JwtAuthGuard), controllers only read req.user (set by JwtAccessStrategy).
-- Web: api.ts centralizes token storage and 401 handling via setUnauthorizedHandler().
-
-CI/CD (future-ready)
---------------------
-- Add GitHub Actions to run `pnpm -w install`, `pnpm -C apps/api build`, `pnpm -C apps/web build`, run Prisma generate, and docker build/push for api.
-- Use `.env.example` as artifacts for configuration hints; inject real secrets via repo/environment secrets.
-
-Troubleshooting quick checklist
--------------------------------
-- DI error? Check module imports/exports/providers.
-- JWT error? Confirm ACCESS/REFRESH secrets and expiration, token header Bearer, and that JwtAccessStrategy is registered.
-- Redis error in container? Use host `redis` instead of localhost.
-- Web 401 loops? Verify VITE_API_URL and token storage flow in api.ts.
-
-EOF
+Changelog (step-06 / step-07)
+- step-06: Added guard service (moderation proxy), basic rules (PII_PHONE, MEETUP_RISK, BULLYING)
+- step-07: Guard rate-limit (5/10s) + E2E tests; PowerShell IWR hotfixes for Expect:100-continue
