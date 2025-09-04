@@ -117,3 +117,5 @@ apps/web/.env
 backups/
 *.backup
 
+/backups/
+**/*.backup

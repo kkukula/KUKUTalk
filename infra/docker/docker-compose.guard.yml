@@ -1,0 +1,11 @@
+﻿services:
+  guard:
+    build:
+      context: ./guard
+    environment:
+      - TARGET=http://api:3001
+    depends_on:
+      - api
+    ports:
+      - "3002:3000"
+    restart: unless-stopped
