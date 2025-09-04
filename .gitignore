@@ -112,3 +112,8 @@ prisma/dev.db
 apps/api/.env
 apps/web/.env
 
+
+# DB backups
+backups/
+*.backup
+
