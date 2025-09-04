@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-// import { PrismaService } from '../infra/prisma/prisma.service';
+﻿import { Injectable } from '@nestjs/common';
+// import { PrismaService } from '../prisma/prisma.service';
 import { ModerationDecision, ModerationStatus } from '@prisma/client';
 
 @Injectable()
@@ -7,12 +7,12 @@ export class ModerationService {
   // constructor(private readonly prisma: PrismaService) {}
   constructor() {}
 
-  // Stub: zwraca pustą listę, aż do czasu dodania modelu i UX
+  // Stub: zwraca pustÄ… listÄ™, aĹĽ do czasu dodania modelu i UX
   async listFlags(_statuses?: ModerationStatus[]) {
     return [];
   }
 
-  // Stub: udajemy sukces (można podpiąć prawdziwe update'y po dodaniu modelu)
+  // Stub: udajemy sukces (moĹĽna podpiÄ…Ä‡ prawdziwe update'y po dodaniu modelu)
   async resolveFlag(
     _id: string,
     _decision: ModerationDecision,
@@ -22,7 +22,8 @@ export class ModerationService {
   }
 
   async check(text: string): Promise<{ allowed: boolean; reason?: string }> {
-    // Tu będzie logika moderacji; na razie zawsze allow
+    // Tu bÄ™dzie logika moderacji; na razie zawsze allow
     return { allowed: true };
   }
 }
+

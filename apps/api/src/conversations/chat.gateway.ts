@@ -1,4 +1,4 @@
-import {
+﻿import {
   MessageBody,
   SubscribeMessage,
   WebSocketGateway,
@@ -6,7 +6,7 @@ import {
   ConnectedSocket,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { PrismaService } from '../infra/prisma/prisma.service';
+import { PrismaService } from '../prisma/prisma.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -60,3 +60,4 @@ export class ChatGateway {
     this.server.to(`conv:${conversationId}`).emit('message:new', msg);
   }
 }
+

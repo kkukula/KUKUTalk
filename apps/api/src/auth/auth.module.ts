@@ -11,7 +11,7 @@ import { PrismaModule } from '../prisma/prisma.module'
 @Module({
   imports: [
     PassportModule,
-    JwtModule.register({}), // dynamic usage in service
+    JwtModule.register({}),
     UsersModule,
     PrismaModule,
   ],

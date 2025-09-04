@@ -1,4 +1,4 @@
-export const API_BASE =
+﻿export const API_BASE =
   (import.meta as any)?.env?.VITE_API_BASE || 'http://localhost:3001';
 
 export function getToken(): string | null {
@@ -81,3 +81,13 @@ export const chat = {
     });
   },
 };
+
+/* ---- patch: auth helpers ---- */
+let __unauthHandler: ((status:number)=>void) | null = null;
+export function setUnauthorizedHandler(fn: (status:number)=>void) { __unauthHandler = fn; }
+export function getUnauthorizedHandler() { return __unauthHandler; }
+export function clearToken(): void {
+  try { localStorage.removeItem("accessToken"); } catch {}
+}
+/* ---- end patch ---- */
+

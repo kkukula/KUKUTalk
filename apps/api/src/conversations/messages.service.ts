@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../infra/prisma/prisma.service';
+﻿import { Injectable } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class MessagesService {
@@ -58,3 +58,4 @@ export class MessagesService {
     return msg;
   }
 }
+

@@ -1,6 +1,6 @@
-import { Controller, Get, Param, Post, Body, Query, Req, UseGuards } from '@nestjs/common';
-import { PrismaService } from '../infra/prisma/prisma.service';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // <- poprawiona ścieżka
+﻿import { Controller, Get, Param, Post, Body, Query, Req, UseGuards } from '@nestjs/common';
+import { PrismaService } from '../prisma/prisma.service';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard'; // <- poprawiona Ĺ›cieĹĽka
 import { MessagesService } from './messages.service';
 
 @UseGuards(JwtAuthGuard)
@@ -11,7 +11,7 @@ export class ConversationsController {
     private readonly messages: MessagesService,
   ) {}
 
-  // Lista rozmów zalogowanego użytkownika
+  // Lista rozmĂłw zalogowanego uĹĽytkownika
   @Get()
   async list(@Req() req: any) {
     const userId: string = req.user.userId;
@@ -22,7 +22,7 @@ export class ConversationsController {
       select: {
         id: true,
         lastMessageAt: true,
-        // Jeśli chcesz etykietę: dołóż select classroom/name zależnie od modelu
+        // JeĹ›li chcesz etykietÄ™: doĹ‚ĂłĹĽ select classroom/name zaleĹĽnie od modelu
         // classroom: { select: { name: true } },
       },
     });
@@ -30,7 +30,7 @@ export class ConversationsController {
     return { items: convs };
   }
 
-  // Pobranie wiadomości w rozmowie (cursor + take)
+  // Pobranie wiadomoĹ›ci w rozmowie (cursor + take)
   @Get(':id/messages')
   async listMessages(
     @Req() req: any,
@@ -40,7 +40,7 @@ export class ConversationsController {
   ) {
     const userId: string = req.user.userId;
 
-    // Autoryzacja: user musi należeć do rozmowy
+    // Autoryzacja: user musi naleĹĽeÄ‡ do rozmowy
     const isMember = await this.prisma.conversation.findFirst({
       where: { id: conversationId, members: { some: { userId } } },
       select: { id: true },
@@ -51,7 +51,7 @@ export class ConversationsController {
     return this.messages.listByConversation(conversationId, take, cursor);
   }
 
-  // Wysłanie wiadomości
+  // WysĹ‚anie wiadomoĹ›ci
   @Post(':id/messages')
   async postMessage(
     @Req() req: any,
@@ -72,3 +72,4 @@ export class ConversationsController {
     return msg;
   }
 }
+

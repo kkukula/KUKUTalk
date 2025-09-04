@@ -1,6 +1,6 @@
 ﻿import { Injectable, UnauthorizedException, BadRequestException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
-import { PrismaService } from '../infra/prisma/prisma.service'
+import { PrismaService } from '../prisma/prisma.service'
 import * as bcrypt from 'bcrypt'
 import { v4 as uuidv4 } from 'uuid'
 import Redis from 'ioredis'
@@ -127,4 +127,5 @@ export class AuthService {
     }
   }
 }
+
 

@@ -1,19 +1,12 @@
-﻿import { Module } from '@nestjs/common';
-import { JwtModule } from '@nestjs/jwt';
-
-import { ConversationsController } from './conversations/conversations.controller';
-import { MessagesService } from './conversations/messages.service';
-import { ChatGateway } from './conversations/chat.gateway';
-
-import { PrismaService } from './infra/prisma/prisma.service';
-import { ModerationService } from './moderation/moderation.service';
+﻿import { Module } from '@nestjs/common'; { PrismaModule } from './prisma/prisma.module';
+ { PrismaModule } from './prisma/prisma.module';
+ { PrismaModule } from './prisma/prisma.module';
 
 @Module({
-   param($m)
-    $inner = $m.Groups[1].Value.Trim()
-    $inner = if ($inner -eq '') { 'AuthModule' } else { $inner.TrimEnd() + ', AuthModule' }
-    "imports: [$inner]"
-  ,
+  
+  $inner = $matches[1]
+  if ($inner -notmatch "(^|,)\s*PrismaModule(\s|,|$)") { "imports: [$inner, PrismaModule]" } else { $matches[0] }
+,
   controllers: [ConversationsController],
   providers: [PrismaService, MessagesService, ModerationService, ChatGateway],
 })
