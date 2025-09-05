@@ -54,8 +54,6 @@ export class AuthService {
   }
 
   async login(username: string, password: string) {
-    if (!username) { throw new UnauthorizedException('Invalid credentials'); }
-
     const user = await this.validateUser(username, password)
     if (!user) throw new UnauthorizedException({ message: 'Invalid credentials' })
     const tokens = await this.issueTokens(user.id, user.username, user.role)
@@ -128,15 +126,6 @@ export class AuthService {
       // ignore
     }
   }
-
-  async loginByEmail(email: string, password: string) {
-    const mail = email?.trim()?.toLowerCase();
-    const u = await this.prisma.user.findUnique({ where: { email: mail } });
-    if (!u) throw new UnauthorizedException('Invalid credentials');
-    return this.login(u.username, password);
-  }
 }
-
-
 
 

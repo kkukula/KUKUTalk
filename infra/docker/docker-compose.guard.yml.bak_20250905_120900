@@ -22,11 +22,6 @@
       redis:
         condition: service_healthy
     restart: unless-stopped
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
 
   guard:
     build:
@@ -40,8 +35,14 @@
     depends_on:
       api:
         condition: service_healthy
-    logging:
-      driver: json-file
-      options:
-        max-size: "10m"
-        max-file: "3"
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+

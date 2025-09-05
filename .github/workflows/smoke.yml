@@ -1,4 +1,4 @@
-﻿name: Smoke (Guard  API)
+﻿name: Smoke (Guard + API)
 on: [push, pull_request]
 jobs:
   smoke:
@@ -9,12 +9,19 @@ jobs:
       - uses: docker/setup-qemu-action@v3
       - name: Compose up
         run: |
-          docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.guard.yml up -d --build
-          sleep 8
+          docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.guard.yml up -d --build --remove-orphans
+      - name: Wait for Guard
+        shell: pwsh
+        run: pwsh tools/wait-guard.ps1 -timeoutSec 60
       - name: Smoke
         shell: pwsh
         run: pwsh tools/smoke.ps1
       - name: Logs (on fail)
         if: failure()
-        run: |
-          docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.guard.yml logs --no-log-prefix api guard
+        run: docker compose -f infra/docker/docker-compose.yml -f infra/docker/docker-compose.guard.yml logs --no-log-prefix api guard > logs.txt
+      - name: Upload logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-logs
+          path: logs.txt
