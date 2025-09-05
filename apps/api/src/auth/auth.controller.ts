@@ -1,4 +1,4 @@
-import {
+﻿import {
   Body,
   Controller,
   Get,
@@ -28,7 +28,7 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   async login(@Body() dto: LoginDto) {
-    return this.auth.login(dto.username, dto.password)
+    return this.auth.loginFlexible(dto.username, dto.password)
   }
 
   @HttpCode(HttpStatus.OK)
@@ -53,3 +53,4 @@ export class AuthController {
     return { user }
   }
 }
+
