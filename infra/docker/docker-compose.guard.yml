@@ -1,4 +1,32 @@
 ﻿services:
-  guard:
+  redis:
+    healthcheck:
+      test: ["CMD", "redis-cli", "PING"]
+      interval: 5s
+      timeout: 2s
+      retries: 30
+
+  api:
     environment:
-      - API_URL=http://api:3000
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379
+    ports:
+      - "3001:3001"
+    depends_on:
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+
+  guard:
+    build:
+      context: ./guard
+    ports:
+      - "3002:3000"
+    environment:
+      - API_URL=http://api:3001
+      - RL=50/10000ms
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
