@@ -13,6 +13,11 @@
       - REDIS_URL=redis://redis:6379
     ports:
       - "3001:3001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s -o /dev/null --connect-timeout 1 http://127.0.0.1:3001/ || exit 1"]
+      interval: 3s
+      timeout: 2s
+      retries: 20
     depends_on:
       redis:
         condition: service_healthy
@@ -29,4 +34,4 @@
     restart: unless-stopped
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
