@@ -1,16 +1,17 @@
 ﻿param(
   [string]$Username="dev1",
+  [string]$Email="",
   [string]$Password="Passw0rd!",
   [string]$Dc="infra/docker/docker-compose.yml",
   [string]$Ov="infra/docker/docker-compose.guard.yml",
   [switch]$StatusOnly
 )
 
-# JSON -> Base64 lokalnie w PS (zero problemów z quotingiem)
-$payload    = @{ username=$Username; password=$Password } | ConvertTo-Json -Compress
+# Jeśli podano Email  użyj pola "email"; w przeciwnym razie "username"
+$body = if ($Email) { @{ email=$Email; password=$Password } } else { @{ username=$Username; password=$Password } }
+$payload    = $body | ConvertTo-Json -Compress
 $payloadB64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($payload))
 
-# Skrypt shellowy wykonywany W KONTENERZE
 $sh = if ($StatusOnly) {
 @"
 printf '%s' '$payloadB64' | base64 -d > /tmp/login.json
