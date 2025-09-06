@@ -26,5 +26,18 @@
   },
   "dependencies": {
     "passport-jwt": "^4.0.1"
-  }
+  },
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/kkukula/KUKUTalk.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/kkukula/KUKUTalk/issues"
+  },
+  "homepage": "https://github.com/kkukula/KUKUTalk#readme"
 }

@@ -16,8 +16,6 @@ async function bootstrap() {
 
   
 
-  
-
   // === AUTH_EMAIL_MODE middleware (auto) ===
   // Tryby: 'disabled' (domyślny), 'both', 'emailonly'
   // Kolejność źródeł: plik (.auth_email_mode w kilku lokalizacjach) -> ENV AUTH_EMAIL_MODE -> 'disabled'
@@ -45,6 +43,8 @@ async function bootstrap() {
   const { PrismaClient } = require('@prisma/client');
   const prismaAuth = new PrismaClient();
 
+  // Upewnij się, że body jest sparsowane zanim wejdzie walidacja Nest (zwykle i tak jest),
+  // ale na wszelki wypadek dodaj JSON parser jeśli nie istnieje.
   try {
     const express = require('express');
     app.use(express.json({ limit: '1mb' }));
@@ -65,14 +65,11 @@ async function bootstrap() {
     }
 
     if (hasEmail) {
-      // Fallback: ustaw username = email, żeby DTO nie odrzucił żądania 400
-      b.username = (b.username && String(b.username)) || String(b.email).trim();
       try {
         const user = await prismaAuth.user.findUnique({ where: { email: b.email } });
-        if (user?.username) {
-          b.username = user.username; // zamień na prawdziwy username, jeśli znaleziono
-        }
-        // Usuń email, by nie uruchamiać ścieżki email OFF  400 po stronie kontrolera/DTO
+        if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+        // mapuj na username i usuń email, by kontroler/DTO nie wywalił 400
+        b.username = user.username;
         delete b.email;
         req.body = b;
       } catch (e) {
@@ -88,7 +85,6 @@ const PORT = Number(process.env.PORT) || 3001;
   console.log(`API listening on http://0.0.0.0:${PORT}`);
 }
 bootstrap();
-
 
 
 

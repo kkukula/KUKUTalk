@@ -12,44 +12,30 @@ async function bootstrap() {
     .filter(Boolean);
   app.enableCors({ origin: allow, credentials: true });
 
-  
-
-  
-
-  
-
   // === AUTH_EMAIL_MODE middleware (auto) ===
   // Tryby: 'disabled' (domyślny), 'both', 'emailonly'
-  // Kolejność źródeł: plik (.auth_email_mode w kilku lokalizacjach) -> ENV AUTH_EMAIL_MODE -> 'disabled'
+  // Źródła konfiguracji (kolejność): plik ./.auth_email_mode (w katalogu pracy procesu) -> ENV AUTH_EMAIL_MODE -> 'disabled'
   const getAuthMode = (): 'disabled' | 'both' | 'emailonly' => {
-    const fs = require('fs');
-    const path = require('path');
-    const candidates = [
-      '.auth_email_mode',
-      path.join(process.cwd?.() ?? '', '.auth_email_mode'),
-      path.join(__dirname ?? '', '..', '..', '.auth_email_mode'),
-      '/app/.auth_email_mode'
-    ].filter(Boolean);
-    for (const p of candidates) {
-      try {
-        if (fs.existsSync(p)) {
-          const v = String(fs.readFileSync(p)).trim().toLowerCase();
-          if (['disabled','both','emailonly'].includes(v)) return v as any;
-        }
-      } catch {}
-    }
+    try {
+      const fs = require('fs');
+      const p = '.auth_email_mode';
+      if (fs.existsSync(p)) {
+        const v = String(fs.readFileSync(p)).trim().toLowerCase();
+        if (v) return (['disabled','both','emailonly'].includes(v) ? v : 'disabled') as any;
+      }
+    } catch {}
     const v = (process.env.AUTH_EMAIL_MODE ?? 'disabled').toLowerCase();
     return (['disabled','both','emailonly'].includes(v) ? (v as any) : 'disabled');
   };
 
+  // Lazy init PrismaClient (require zamiast import, żeby nie modyfikować nagłówka)
   const { PrismaClient } = require('@prisma/client');
   const prismaAuth = new PrismaClient();
 
-  try {
-    const express = require('express');
-    app.use(express.json({ limit: '1mb' }));
-  } catch {}
-
+  // Middleware na /auth/login:
+  //  - disabled: odrzuca gdy przyjdzie 'email'
+  //  - emailonly: odrzuca gdy nie przyjdzie 'email'
+  //  - both: akceptuje oba; gdy przyjdzie 'email', zamienia na username po lookupie.
   app.use('/auth/login', async (req: any, res: any, next: any) => {
     const mode = getAuthMode();
     const b = (req.body ?? {});
@@ -65,15 +51,11 @@ async function bootstrap() {
     }
 
     if (hasEmail) {
-      // Fallback: ustaw username = email, żeby DTO nie odrzucił żądania 400
-      b.username = (b.username && String(b.username)) || String(b.email).trim();
       try {
         const user = await prismaAuth.user.findUnique({ where: { email: b.email } });
-        if (user?.username) {
-          b.username = user.username; // zamień na prawdziwy username, jeśli znaleziono
-        }
-        // Usuń email, by nie uruchamiać ścieżki email OFF  400 po stronie kontrolera/DTO
-        delete b.email;
+        if (!user) return res.status(401).json({ message: 'Invalid credentials' });
+        // Normalizacja dla istniejących kontrolerów oczekujących 'username'
+        b.username = user.username;
         req.body = b;
       } catch (e) {
         console.error('AUTH_EMAIL_MODE middleware error:', e);
@@ -88,9 +70,6 @@ const PORT = Number(process.env.PORT) || 3001;
   console.log(`API listening on http://0.0.0.0:${PORT}`);
 }
 bootstrap();
-
-
-
 
 
 

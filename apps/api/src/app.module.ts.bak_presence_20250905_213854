@@ -1,9 +1,5 @@
 ﻿import { BullModule } from '@nestjs/bullmq';
 import { Module } from '@nestjs/common';
-
-
-import { RealtimeModule } from './realtime/realtime.module';
-import { PresenceModule } from './presence/presence.module';
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import { ClassroomsModule } from './classrooms/classrooms.module';
@@ -15,7 +11,7 @@ import { ParentModule } from './parent/parent.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { UsersModule } from './shared/users.module';
 
-@Module({ imports: [ PresenceModule, 
+@Module({ imports: [
   BullModule.forRoot({
   connection: {
     host: process.env.REDIS_HOST || 'redis',
@@ -26,6 +22,4 @@ import { UsersModule } from './shared/users.module';
 }), AuthModule, ChatModule, ClassroomsModule, ContactsModule, ConversationsModule, GuardiansModule, ModerationModule, ParentModule, PrismaModule, UsersModule ],
 })
 export class AppModule {}
-
-
 

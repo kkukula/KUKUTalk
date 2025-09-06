@@ -1,0 +1,1 @@
+{"version":3,"file":"conversations.module.js","sourceRoot":"","sources":["../../src/conversations/conversations.module.ts"],"names":[],"mappings":";;;;;;;;;AAAA,qFAAgF;AAChF,2CAAwC;AACxC,yEAAqE;AAM9D,IAAM,mBAAmB,GAAzB,MAAM,mBAAmB;CAAG,CAAA;AAAtB,kDAAmB;8BAAnB,mBAAmB;IAJ/B,IAAA,eAAM,EAAC;QACN,WAAW,EAAE,CAAC,kDAAuB,EAAE,6DAA4B,CAAC;QACpE,SAAS,EAAE,EAAE;KACd,CAAC;GACW,mBAAmB,CAAG"}

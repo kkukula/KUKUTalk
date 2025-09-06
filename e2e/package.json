@@ -1,0 +1,11 @@
+﻿{
+  "name": "kukutalk-e2e",
+  "private": true,
+  "type": "module",
+  "devDependencies": {
+    "@playwright/test": "^1.46.0"
+  },
+  "scripts": {
+    "test": "playwright test --reporter=list"
+  }
+}
