@@ -1,20 +1,32 @@
 name: kukutalk-staging
 services:
   backend:
-    image: ${REGISTRY}/${IMAGE_BACKEND}:latest
+    image: \/\:latest
     environment:
       NODE_ENV: production
       PORT: 3001
-    # Jeżeli chcesz ładować sekrety z pliku na serwerze:
-    # env_file: .env.staging
-    ports:
-      - "3001:3001"
+      JWT_SECRET: \
+      # DB_URL: \          # (opcjonalnie gdy przejdziesz na DB)
     restart: unless-stopped
+    networks: [appnet]
+    # Jeśli backend zapisuje pliki na dysk, odkomentuj:
+    # volumes:
+    #   - kukutalk_data:/app/data
 
   web:
-    image: ${REGISTRY}/${IMAGE_WEB}:latest
-    depends_on:
-      - backend
+    image: \/\:latest
+    environment:
+      VITE_API_URL: /api
+    depends_on: [backend]
     ports:
-      - "8080:80"
+      - "80:80"
     restart: unless-stopped
+    networks: [appnet]
+
+networks:
+  appnet:
+    driver: bridge
+
+volumes:
+  kukutalk_data:
+    driver: local
