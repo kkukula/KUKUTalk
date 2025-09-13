@@ -1,0 +1,20 @@
+name: kukutalk-staging
+services:
+  backend:
+    image: ${REGISTRY}/${IMAGE_BACKEND}:latest
+    environment:
+      NODE_ENV: production
+      PORT: 3001
+    # Jeżeli chcesz ładować sekrety z pliku na serwerze:
+    # env_file: .env.staging
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
+  web:
+    image: ${REGISTRY}/${IMAGE_WEB}:latest
+    depends_on:
+      - backend
+    ports:
+      - "8080:80"
+    restart: unless-stopped

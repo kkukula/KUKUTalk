@@ -1,0 +1,52 @@
+# KUKUTalk Security Notes
+
+- Helmet enabled with basic CSP for local dev.
+- Rate limit per IP: window RATE_LIMIT_WINDOW_MS, max RATE_LIMIT_MAX.
+- Body limit: BODY_LIMIT.
+- CORS strict allowlist from CORS_ALLOWLIST (fallback CORS_ORIGIN).
+- Message validation: length cap MSG_MAX_LEN, throttling per socket MSG_MIN_INTERVAL_MS.
+- HPP protection and compression enabled.
+- No PII stored in logs. Audit minimal.
+
+Tune values in .env.
+
+Stage 5:
+- Prometheus metrics at /metrics (bearer token optional).
+- HTTP logging without PII, default metrics enabled.
+- Socket metrics: connections, acks, blocks.
+- Health endpoint includes uptime and version.
+
+Stage 6:
+- Secure attachments MVP: POST /upload (auth), magic-bytes type check and SHA-256, size and mime whitelist.
+- Files stored under data/uploads with metadata in uploads-index.json.
+- GET /files/:id (auth) serves only clean files.
+
+Stage 7:
+- Parent dashboard (stats, whitelist editor, children list).
+- Append-only audit log with endpoints GET /audit and /audit.csv (parent only).
+- Socket/whitelist/upload events recorded.
+
+
+Stage 8:
+- E2E encryption MVP for text using client-side secretbox; format E2E.v1.<nonce>.<ct>.
+- Server never sees plaintext; moderation is skipped for E2E but parental room checks still apply.
+- UI: local passphrase and enable switch; decryption on receive.
+
+
+Stage 9:
+- Notifications: Web Push (VAPID) and e-mail (SMTP or file outbox) via in-memory queue with retry/backoff.
+- Parent endpoints: GET/POST /notify/prefs, POST /notify/subscribe, GET /notify/vapid, POST /notify/test.
+- Child chat_block triggers alert to parent (push + optional e-mail).
+
+Stage 10:
+- Message history with ring buffer, persisted to data/messages.json.
+- GET /chat/history protected by roles; child can fetch only whitelisted room.
+- Frontend adds Load button to fetch last messages for a room.
+
+
+
+Stage 10:
+- Message history with ring buffer, persisted to data/messages.json.
+- GET /chat/history protected by roles; child can fetch only whitelisted room.
+- Frontend adds Load button to fetch last messages for a room.
+

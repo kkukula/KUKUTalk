@@ -1,0 +1,20 @@
+import React, { useState } from 'react'
+export default function Composer({ onSend, disabled }) {
+  const [val, setVal] = useState('')
+  const [room, setRoom] = useState('')
+  function send() {
+    const v = (val||'').trim()
+    if (!v) return
+    onSend(v, room.trim() || undefined)
+    setVal('')
+  }
+  return (
+    <div style={{display:'flex', gap:10}}>
+      <input value={room} onChange={e=>setRoom(e.target.value)} placeholder='room (optional / required for child)'
+             style={{width:260, padding:'10px 12px', border:'1px solid #d1d5db', borderRadius:10}} />
+      <input value={val} onChange={e=>setVal(e.target.value)} onKeyDown={e=>{ if(e.key==='Enter') send() }}
+             placeholder='Type a message...' style={{flex:1, padding:'10px 12px', border:'1px solid #d1d5db', borderRadius:10}} />
+      <button onClick={send} disabled={disabled} style={{padding:'10px 14px', borderRadius:10, background:'#0ea5e9', color:'#fff', border:'none'}}>Send</button>
+    </div>
+  )
+}

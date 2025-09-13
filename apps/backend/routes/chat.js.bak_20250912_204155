@@ -1,0 +1,21 @@
+const { history } = require('../lib/messages')
+const { readJson } = require('../lib/store')
+
+function canChildAccess(user, room){
+  const roles = (user && user.roles) || []
+  if (roles.indexOf('child') === -1) return true
+  if (!room) return false
+  const db = readJson()
+  const parent = (db.users||[]).find(u => Array.isArray(u.children) && u.children.indexOf(user.sub)!==-1)
+  const wl = (parent && parent.whitelist) || []
+  return wl.indexOf(room)!==-1
+}
+
+function historyRoute(req, res){
+  const room = req.query && req.query.room ? String(req.query.room) : null
+  if (!canChildAccess(req.user, room)) return res.status(403).json({ error:'not_whitelisted' })
+  const limit = Number((req.query && req.query.limit) || 50)
+  return res.json({ items: history(room, limit) })
+}
+
+module.exports = { history: historyRoute }

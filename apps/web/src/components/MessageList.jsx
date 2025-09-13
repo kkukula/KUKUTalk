@@ -1,0 +1,22 @@
+import React from 'react'
+function fmt(ts){ try { return new Date(ts).toLocaleTimeString() } catch(e){ return '' } }
+export default function MessageList({ items, me, system }) {
+  return (
+    <div style={{border:'1px solid #e5e7eb', borderRadius:12, padding:12, minHeight:240, marginBottom:12, background:'#fff', boxShadow:'0 1px 3px rgba(0,0,0,0.06)'}}>
+      {(items && items.length) ? items.map((m, i) => (
+        <div key={i} style={{margin:'10px 0'}}>
+          <strong style={{color: m.from===me ? '#0a7' : '#0b5'}}> {m.from}</strong>
+          <span style={{opacity:0.6, marginLeft:8, fontSize:12}}>{fmt(m.ts)}</span>
+          <div style={{marginTop:2}}>{m.text}</div>
+          {m.room ? <div style={{fontSize:12, opacity:0.7}}>room: {m.room}</div> : null}
+        </div>
+      )) : <div style={{opacity:0.6}}>Brak wiadomosci</div>}
+      {system && system.type==='block' ? (
+        <div style={{marginTop:10, padding:10, background:'#fff1f2', border:'1px solid #fecdd3', borderRadius:8}}>
+          Blocked by server: {String((system.payload && system.payload.reason) || 'unknown')}
+        </div>
+      ) : null}
+    </div>
+  )
+}
+

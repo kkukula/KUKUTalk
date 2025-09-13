@@ -1,0 +1,74 @@
+import React from 'react'
+const base = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+export default function Composer({ onSend, onLoad, onLoadOlder }){
+  const [room, setRoom] = React.useState('')
+  const [text, setText] = React.useState('')
+  const [cooldownUntil, setCooldownUntil] = React.useState(0)
+
+  const nowTs = Date.now()
+  const cooldownMs = Math.max(0, cooldownUntil - nowTs)
+  React.useEffect(() => {
+    if (cooldownMs <= 0) return
+    const t = setInterval(() => setCooldownUntil(v => v), 200)
+    return () => clearInterval(t)
+  }, [cooldownMs])
+
+  function sendFallback(t, r){
+    try { if (typeof window !== 'undefined' && window.__useSock && window.__useSock.sendMessage) { window.__useSock.sendMessage(t, r||null) } } catch(_e){}
+  }
+  function loadFallback(r){
+    try { if (typeof window !== 'undefined' && window.__useSock && window.__useSock.loadHistory) { window.__useSock.loadHistory(r||null) } } catch(_e){}
+  }
+  function olderFallback(r){
+    try { if (typeof window !== 'undefined' && window.__useSock && window.__useSock.loadOlder) { window.__useSock.loadOlder(r||null) } } catch(_e){}
+  }
+
+  const handleSend  = onSend      || sendFallback
+  const handleLoad  = onLoad      || loadFallback
+  const handleOlder = onLoadOlder || olderFallback
+
+  function send(){
+    if (cooldownMs > 0) return
+    handleSend(text, room || null)
+    setText('')
+    setCooldownUntil(Date.now() + 900)
+  }
+  function load(){ handleLoad(room || null) }
+  function loadOlder(){ handleOlder(room || null) }
+  function exportCsv(){
+    const u = base + '/chat/export.csv' + (room ? ('?room=' + encodeURIComponent(room)) : '')
+    window.open(u, '_blank')
+  }
+
+  return (
+    <div data-cooldown-info='cooldown'>
+      {cooldownMs > 0 && (
+        <div style={{ fontSize: 12, color: '#b91c1c' }}>
+          Ograniczenie szybkosci: poczekaj {cooldownMs} ms
+        </div>
+      )}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
+        <input
+          value={room}
+          onChange={(e) => setRoom(e.target.value)}
+          placeholder='pokoj (opcjonalnie / wymagany dla dziecka)'
+          style={{ flex: '0 0 180px', padding: '8px', border: '1px solid #d1d5db', borderRadius: 8 }}
+        />
+        <input
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder='Wpisz wiadomosc...'
+          style={{ flex: 1, padding: '8px', border: '1px solid #d1d5db', borderRadius: 8 }}
+          onKeyDown={(e) => { if (e.key === 'Enter') { send() } }}
+        />
+        <button onClick={load} style={{ padding: '8px 10px', borderRadius: 8 }}>Wczytaj</button>
+        <button onClick={loadOlder} style={{ padding: '8px 10px', borderRadius: 8 }}>Wczytaj starsze</button>
+        <button onClick={send} disabled={cooldownMs > 0} style={{ padding: '8px 10px', borderRadius: 8 }}>
+          {cooldownMs > 0 ? ('Wyslij (za ' + cooldownMs + ' ms)') : 'Wyslij'}
+        </button>
+        <button onClick={exportCsv} style={{ padding: '8px 10px', borderRadius: 8 }}>Eksport CSV</button>
+      </div>
+    </div>
+  )
+}

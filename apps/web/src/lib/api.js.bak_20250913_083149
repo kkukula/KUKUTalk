@@ -1,0 +1,19 @@
+export function apiBase() {
+  return (import.meta && import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:3001'
+}
+export async function postJson(path, body, token) {
+  const r = await fetch(apiBase() + path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...(token ? { 'Authorization': 'Bearer ' + token } : {}) },
+    body: JSON.stringify(body||{})
+  })
+  const text = await r.text()
+  let json=null; try{ json = JSON.parse(text) }catch(e){}
+  return { ok:r.ok, status:r.status, data:json, raw:text }
+}
+export async function getJson(path, token) {
+  const r = await fetch(apiBase() + path, { headers: token ? { 'Authorization': 'Bearer ' + token } : undefined })
+  const text = await r.text()
+  let json=null; try{ json = JSON.parse(text) }catch(e){}
+  return { ok:r.ok, status:r.status, data:json, raw:text }
+}

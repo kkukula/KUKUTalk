@@ -1,0 +1,51 @@
+const http = require('http')
+const io = require('socket.io-client')
+
+function post(path, body, token) {
+  const data = Buffer.from(JSON.stringify(body))
+  return new Promise((resolve, reject) => {
+    const headers = { 'Content-Type':'application/json', 'Content-Length': data.length }
+    if (token) headers['Authorization'] = 'Bearer ' + token
+    const req = http.request({ host:'localhost', port: process.env.PORT||3001, path, method:'POST', headers }, res => {
+      let buf=''; res.on('data', c=>buf+=c); res.on('end', ()=>resolve({status:res.statusCode, body:buf}))
+    })
+    req.on('error', reject); req.write(data); req.end()
+  })
+}
+;(async () => {
+  const email = 'parent+' + Date.now() + '@example.com'
+  await post('/auth/register-parent', { email, password:'Passw0rd!' })
+  let r = await post('/auth/login', { email, password:'Passw0rd!' })
+  const token = JSON.parse(r.body).token
+  await post('/mod/whitelist', { items: ['example.com'] }, token)
+
+  const url = 'ws://localhost:' + (process.env.PORT||3001)
+  const client = io(url, { auth:{} })
+  let results = []
+
+  results.push(await new Promise(res=>{
+    let t=setTimeout(()=>res('timeout'),1500)
+    client.once('connect', ()=> client.emit('chat:message',{from:'T', text:'this has badword'}))
+    client.once('system:block', p=>{ clearTimeout(t); res(p && p.reason) })
+  }))
+  client.close()
+
+  const c2 = io(url, { auth:{} })
+  results.push(await new Promise(res=>{
+    let t=setTimeout(()=>res('timeout'),1500)
+    c2.once('connect', ()=> c2.emit('chat:message',{from:'T', text:'visit https://not-allowed-domain.test'}))
+    c2.once('system:block', p=>{ clearTimeout(t); res(p && p.reason) })
+  }))
+  c2.close()
+
+  const c3 = io(url, { auth:{} })
+  results.push(await new Promise(res=>{
+    let t=setTimeout(()=>res('timeout'),1500)
+    c3.once('connect', ()=> c3.emit('chat:message',{from:'T', text:'ok https://example.com/page'}))
+    c3.once('system:ack', ()=>{ clearTimeout(t); res('ack') })
+  }))
+  c3.close()
+
+  console.log(JSON.stringify({ pass: true, notes: results }, null, 2))
+  process.exit(0)
+})().catch(e=>{ console.error(e); process.exit(2) })

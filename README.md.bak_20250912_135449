@@ -1,0 +1,8 @@
+# KUKUTalk monorepo
+
+Structure:
+- apps/web       -> React + Vite frontend (Socket.IO client)
+- apps/backend   -> Node + Express + Socket.IO server
+- packages/shared-> shared utils (future)
+
+This repo is a minimal MVP scaffold to run a realtime chat demo.

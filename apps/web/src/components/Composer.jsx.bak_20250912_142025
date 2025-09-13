@@ -1,0 +1,25 @@
+import React, { useState } from 'react'
+
+export default function Composer({ onSend, disabled }) {
+  const [val, setVal] = useState('')
+  function send() {
+    const v = (val||'').trim()
+    if (!v) return
+    onSend(v)
+    setVal('')
+  }
+  return (
+    <div style={{display:'flex', gap:8}}>
+      <input
+        value={val}
+        onChange={e=>setVal(e.target.value)}
+        onKeyDown={e=>{ if(e.key==='Enter') send() }}
+        placeholder='Type a message...'
+        style={{flex:1, padding:'10px 12px', border:'1px solid #ccc', borderRadius:8}}
+      />
+      <button onClick={send} disabled={disabled} style={{padding:'10px 14px', borderRadius:8}}>
+        Send
+      </button>
+    </div>
+  )
+}

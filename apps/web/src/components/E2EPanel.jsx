@@ -1,0 +1,36 @@
+import React, { useEffect, useState } from 'react'
+
+export default function E2EPanel({ onChange }){
+  const [enabled, setEnabled] = useState(false)
+  const [pass, setPass] = useState('')
+
+  useEffect(()=>{
+    const e = localStorage.getItem('kuku_e2e_enabled') === '1'
+    const p = localStorage.getItem('kuku_e2e_pass') || ''
+    setEnabled(e); setPass(p)
+    onChange && onChange({ enabled: e, pass })
+    // eslint-disable-next-line
+  }, [])
+
+  useEffect(()=>{
+    localStorage.setItem('kuku_e2e_enabled', enabled ? '1' : '0')
+    localStorage.setItem('kuku_e2e_pass', pass)
+    onChange && onChange({ enabled, pass })
+  }, [enabled, pass])
+
+  return (
+    <div style={{background:'#fff', border:'1px solid #e5e7eb', borderRadius:12, padding:10, marginBottom:12}}>
+      <div style={{fontWeight:700, marginBottom:6}}>Szyfrowanie E2E</div>
+      <div style={{display:'flex', gap:10, alignItems:'center'}}>
+        <label style={{display:'flex', alignItems:'center', gap:6}}>
+          <input type='checkbox' checked={enabled} onChange={e=>setEnabled(e.target.checked)} />
+          <span>Wlacz \(tylko lokalnie\)</span>
+        </label>
+        <input type='password' value={pass} onChange={e=>setPass(e.target.value)} placeholder='haslo'
+               style={{flex:1, maxWidth:320, padding:'8px 10px', border:'1px solid #d1d5db', borderRadius:8}} />
+        <span style={{fontSize:12, opacity:0.7}}>Klucz jest wyliczany per pokoj z tego hasla.</span>
+      </div>
+    </div>
+  )
+}
+

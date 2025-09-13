@@ -1,0 +1,89 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import io from 'socket.io-client'
+import { encryptMessage, decryptMessage, isE2EText } from '../lib/e2e'
+
+export function useSocket(user, e2e, token){
+  const [connected, setConnected] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [system, setSystem] = useState(null)
+  const socketRef = useRef(null)
+
+  const base = useMemo(()=> (import.meta.env.VITE_API_URL || 'http://localhost:3001'), [])
+  const auth = useMemo(()=> (user && user.token) ? { token: user.token } : {}, [user])
+
+  useEffect(()=>{
+    const s = io(base, { auth })
+    socketRef.current = s
+    s.on('connect', ()=> setConnected(true))
+    s.on('disconnect', ()=> setConnected(false))
+    s.on('system:block', (p)=> setSystem({ type:'block', payload:p }))
+    s.on('system:ack', ()=> setSystem(null))
+    s.on('chat:message', async (m)=>{
+      let txt = m.text
+      if (isE2EText(txt) && e2e && e2e.enabled && e2e.pass){ try { const dec = await decryptMessage(txt, e2e.pass, m.room || '') ; if (dec) txt = dec } catch(e){} }
+      const keyCid = m.cid || ''
+      const keyMatch = (x)=> (keyCid && x.cid===keyCid) || (!keyCid && x.ts===m.ts && x.from===m.from && (x.room||'')===(m.room||''))
+      setMessages(prev=>{
+        const idx = prev.findIndex(keyMatch)
+        const item = { from: m.from, text: txt, ts: m.ts, room: m.room || null, cid: keyCid || null }
+        if (idx >= 0) { const copy = prev.slice(); copy[idx] = item; return copy }
+        return prev.concat([item])
+      })
+    })
+    return ()=>{ try{ s.close() }catch(e){} }
+  }, [base, auth, e2e && e2e.enabled, e2e && e2e.pass])
+
+  async function loadHistory(room){
+    const hdr = (user && user.token) ? { 'Authorization':'Bearer '+user.token } : {}
+    const q = room ? ('?room='+encodeURIComponent(room)) : ''
+    const res = await fetch(base + '/chat/history' + q, { headers: hdr })
+    const data = await res.json().catch(()=>({items:[]}))
+    const items = Array.isArray(data.items) ? data.items : []
+    const out = []
+    for (const m of items){
+      let txt = m.text
+      if (isE2EText(txt) && e2e && e2e.enabled && e2e.pass){
+        try { const dec = await decryptMessage(txt, e2e.pass, m.room || '') ; if (dec) txt = dec } catch(e){}
+      }
+      out.push({ from: m.from, text: txt, ts: m.ts, room: m.room || null, cid: m.cid || null })
+    }
+    setMessages(out)
+  }
+
+  async function sendMessage(text, room){
+    const s = socketRef.current; if (!s) return
+    const from = (user && user.name) || 'DemoUser'
+    const ts = Date.now()
+    const plain = String(text||'')
+    const cid = ts.toString(36) + '-' + Math.random().toString(16).slice(2)
+    setMessages(prev => prev.concat([{ from, text: plain, ts, room: room || null, cid }]))
+    let payload = { from, text: plain, ts, cid }
+    if (room) payload.room = room
+    if (e2e && e2e.enabled && e2e.pass){ try { payload.text = await encryptMessage(plain, e2e.pass, room || '') } catch(e){} }
+    s.emit('chat:message', payload)
+  }
+
+      try {
+      if (typeof window !== 'undefined') {
+        window.__useSock = {
+          sendMessage: (typeof sendMessage!=='undefined'?sendMessage:undefined),
+          loadHistory: (typeof loadHistory!=='undefined'?loadHistory:undefined),
+          loadOlder:   (typeof loadOlder!=='undefined'?loadOlder:undefined),
+          messages: (typeof messages!=='undefined'?messages:undefined)
+        };
+      }
+    } catch(_e) {}
+    try {
+      if (typeof window !== 'undefined') {
+        window.__useSock = {
+          sendMessage: (typeof sendMessage!=='undefined'?sendMessage:undefined),
+          loadHistory: (typeof loadHistory!=='undefined'?loadHistory:undefined),
+          loadOlder:   (typeof loadOlder!=='undefined'?loadOlder:undefined),
+          messages: (typeof messages!=='undefined'?messages:undefined)
+        };
+      }
+    } catch(_e) {}
+return { connected, sendMessage, messages, system, loadHistory }
+}
+
+

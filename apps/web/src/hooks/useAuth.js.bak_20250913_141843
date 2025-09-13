@@ -1,0 +1,74 @@
+import { useEffect, useState, useCallback } from 'react'
+
+const base = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+
+function readStored(){
+  try { return JSON.parse(localStorage.getItem('auth') || 'null') } catch { return null }
+}
+
+export function useAuth(){
+  const [user, setUser]   = useState(() => readStored())
+  const [error, setError] = useState(null)
+
+  // persist
+  useEffect(() => {
+    try {
+      if (user) localStorage.setItem('auth', JSON.stringify(user))
+      else localStorage.removeItem('auth')
+    } catch {}
+  }, [user])
+
+  const login = useCallback(async (id, pass) => {
+    setError(null)
+    try{
+      const r = await fetch(base + '/login', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ id, pass })
+      })
+      const j = await r.json().catch(() => ({}))
+      if ((r.ok || j?.token) && j?.token){
+        const u = { id, name:id, token:j.token, roles:j.roles || [] }
+        setUser(u)
+        setError(null)
+        return { ok:true, data:u }
+      }
+      setError('login_failed')
+      return { ok:false }
+    }catch{
+      setError('login_failed')
+      return { ok:false }
+    }
+  },[])
+
+  const register = useCallback(async (id, pass) => {
+    setError(null)
+    try{
+      const r = await fetch(base + '/register', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ id, pass })
+      })
+      const j = await r.json().catch(() => ({}))
+      if ((r.ok || j?.token) && j?.token){
+        const u = { id, name:id, token:j.token, roles:j.roles || [] }
+        setUser(u)
+        setError(null)
+        return { ok:true, data:u }
+      }
+      setError('register_failed')
+      return { ok:false }
+    }catch{
+      setError('register_failed')
+      return { ok:false }
+    }
+  },[])
+
+  const logout = useCallback(() => {
+    setUser(null)
+    setError(null)
+    try { if (typeof window !== 'undefined' && window.__useSock?.reset) window.__useSock.reset() } catch {}
+  },[])
+
+  return { user, setUser, error, login, register, logout }
+}

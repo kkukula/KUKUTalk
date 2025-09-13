@@ -1,0 +1,128 @@
+// KUKUTalk – useAuth (solidny login, zapis tokenu, reset widoku po logout)
+// PS: brak zależności od innych helperów – wszystko lokalnie.
+import React from "react"
+
+const API = import.meta.env.VITE_API_URL || "http://localhost:3001"
+
+/** Prosty dekoder payload JWT (bez weryfikacji) */
+function parseJwt(token){
+  try {
+    const p = token.split('.')[1]
+    const json = atob(p.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(decodeURIComponent(Array.prototype.map.call(json, c =>
+      '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)
+    ).join('')))
+  } catch(_){ return {} }
+}
+
+/** Dołącz Authorization dla fetch – tylko gdy mamy token */
+function authFetch(token){
+  return async (url, opts={}) => {
+    const headers = new Headers(opts.headers || {})
+    if (token) headers.set('Authorization', 'Bearer ' + token)
+    return fetch(url, { ...opts, headers })
+  }
+}
+
+export default function useAuth(){
+  const [user, setUser]   = React.useState(null)
+  const [error, setError] = React.useState(null)
+  const [busy, setBusy]   = React.useState(false)
+
+  // wczytaj usera z localStorage (o ile jest)
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem('kuku_user')
+      if (raw){
+        const u = JSON.parse(raw)
+        setUser(u || null)
+      }
+    } catch(_){}
+  }, [])
+
+  // login
+  async function login(nameOrEmail, password){
+    setBusy(true); setError(null)
+    try{
+      // backend przyjmuje 'email' – ale to może być nazwa użytkownika
+      const body = { email: nameOrEmail, password }
+      const r = await fetch(API + '/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify(body),
+      })
+      const data = await r.json().catch(()=> ({}))
+
+      if(r.ok && data && data.token){
+        // zdekoduj payload (opcjonalnie: roles, sub, name itd.)
+        const payload = parseJwt(data.token) || {}
+        const roles = Array.isArray(payload.roles) ? payload.roles : []
+        const u = {
+          name: payload.name || nameOrEmail,
+          email: payload.email || nameOrEmail,
+          token: data.token,
+          roles
+        }
+        setUser(u)
+        localStorage.setItem('kuku_user', JSON.stringify(u))
+        setError(null)
+        return u
+      }
+      setError(data?.error || 'login_failed')
+      return null
+    } catch(e){
+      setError('network_error')
+      return null
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  // register (opcjonalnie)
+  async function register(nameOrEmail, password){
+    setBusy(true); setError(null)
+    try{
+      const r = await fetch(API + '/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type':'application/json' },
+        body: JSON.stringify({ email: nameOrEmail, password }),
+      })
+      const data = await r.json().catch(()=> ({}))
+      if(r.ok && data?.token){
+        const payload = parseJwt(data.token) || {}
+        const roles = Array.isArray(payload.roles) ? payload.roles : []
+        const u = {
+          name: payload.name || nameOrEmail,
+          email: payload.email || nameOrEmail,
+          token: data.token,
+          roles
+        }
+        setUser(u)
+        localStorage.setItem('kuku_user', JSON.stringify(u))
+        setError(null)
+        return u
+      }
+      setError(data?.error || 'register_failed')
+      return null
+    } catch(_){
+      setError('network_error')
+      return null
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  function logout(){
+    try {
+      localStorage.removeItem('kuku_user')
+    } catch(_){}
+    setUser(null)
+    // resetuj listę wiadomości w UI, o ile most jest dostępny
+    try { if (typeof window !== 'undefined' && window.__useSock?.reset) window.__useSock.reset() } catch(_){}
+  }
+
+  // zautoryzowany fetch (do użycia w innych hookach/komponentach)
+  const afetch = React.useMemo(() => authFetch(user?.token || ''), [user?.token])
+
+  return { user, setUser, error, busy, login, register, logout, afetch }
+}

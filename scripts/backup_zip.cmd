@@ -1,0 +1,1 @@
+powershell -NoProfile -ExecutionPolicy Bypass -File C:\projekty\KUKUTalk\scripts\backup_zip.ps1

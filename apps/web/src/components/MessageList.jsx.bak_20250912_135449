@@ -1,0 +1,13 @@
+import React from 'react'
+
+export default function MessageList({ items, me }) {
+  return (
+    <div style={{border:'1px solid #ddd', borderRadius:8, padding:12, minHeight:200, marginBottom:10}}>
+      {(items && items.length) ? items.map((m, i) => (
+        <div key={i} style={{margin:'6px 0'}}>
+          <strong style={{color: m.from===me ? '#0a7' : '#06c'}}>{m.from}</strong>: {m.text}
+        </div>
+      )) : <div style={{opacity:0.6}}>No messages yet</div>}
+    </div>
+  )
+}

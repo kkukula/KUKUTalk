@@ -1,0 +1,44 @@
+import React, { useState } from 'react'
+import { postJson } from '../lib/api'
+
+export default function AuthPanel({ onAuth }) {
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+
+  async function register() {
+    setBusy(true); setMsg('')
+    const r = await postJson('/auth/register-parent', { email, password })
+    if (!r.ok) setMsg('Register failed: ' + (r.raw||r.status))
+    else setMsg('Registered, now login.')
+    setBusy(false)
+  }
+  async function login() {
+    setBusy(true); setMsg('')
+    const r = await postJson('/auth/login', { email, password })
+    if (!r.ok || !r.data || !r.data.token) { setMsg('Login failed'); setBusy(false); return }
+    const token = r.data.token
+    try { localStorage.setItem('kukutalk_token', token) } catch(e){}
+    try { localStorage.setItem('kukutalk_name', email) } catch(e){}
+    onAuth && onAuth({ token, name: email, roles:['parent'] })
+    setBusy(false)
+  }
+
+  return (
+    <div style={{border:'1px solid #ddd', padding:12, borderRadius:8, marginBottom:12}}>
+      <div style={{fontWeight:600, marginBottom:8}}>Parent sign-in</div>
+      <div style={{display:'flex', gap:8, marginBottom:8}}>
+        <input style={{flex:1, padding:'8px 10px', border:'1px solid #ccc', borderRadius:8}}
+               placeholder='email' value={email} onChange={e=>setEmail(e.target.value)} />
+        <input type='password' style={{flex:1, padding:'8px 10px', border:'1px solid #ccc', borderRadius:8}}
+               placeholder='password (min 8)' value={password} onChange={e=>setPassword(e.target.value)} />
+      </div>
+      <div style={{display:'flex', gap:8}}>
+        <button disabled={busy} onClick={register} style={{padding:'8px 12px', borderRadius:8}}>Register</button>
+        <button disabled={busy} onClick={login} style={{padding:'8px 12px', borderRadius:8}}>Login</button>
+      </div>
+      {msg ? <div style={{marginTop:8, opacity:0.8}}>{msg}</div> : null}
+    </div>
+  )
+}

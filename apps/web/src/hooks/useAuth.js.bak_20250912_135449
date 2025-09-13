@@ -1,0 +1,10 @@
+import { useMemo } from 'react'
+
+export function useAuth() {
+  // demo identity
+  const user = useMemo(() => {
+    const name = (typeof localStorage !== 'undefined' && localStorage.getItem('kukutalk_name')) || 'DemoUser'
+    return { name }
+  }, [])
+  return { user }
+}

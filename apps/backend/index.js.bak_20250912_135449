@@ -1,0 +1,27 @@
+require('dotenv').config()
+const express = require('express')
+const cors = require('cors')
+const http = require('http')
+
+const app = express()
+const PORT = Number(process.env.PORT || 3001)
+const ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
+
+app.use(cors({ origin: ORIGIN }))
+app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }))
+
+const server = http.createServer(app)
+const io = require('socket.io')(server, {
+  cors: { origin: ORIGIN, methods: ['GET','POST'] }
+})
+
+io.on('connection', (socket) => {
+  socket.on('chat:message', (msg) => {
+    // broadcast to others
+    socket.broadcast.emit('chat:message', msg)
+  })
+})
+
+server.listen(PORT, () => {
+  console.log('KUKUTalk backend listening on http://localhost:' + PORT)
+})

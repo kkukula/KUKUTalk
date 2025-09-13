@@ -1,0 +1,89 @@
+require('dotenv').config()
+const express = require('express')
+const cors = require('cors')
+const http = require('http')
+const helmet = require('helmet')
+const rateLimit = require('express-rate-limit')
+const compression = require('compression')
+const hpp = require('hpp')
+const { requireAuth, requireRole } = require('./middleware/authz')
+const { registerParent, login, me } = require('./routes/auth')
+const { createChild, listChildren, addWhitelist } = require('./routes/profiles')
+
+const app = express()
+const PORT = Number(process.env.PORT || 3001)
+const ORIGIN = process.env.CORS_ORIGIN || 'http://localhost:5173'
+const ALLOWLIST = (process.env.CORS_ALLOWLIST || ORIGIN).split(',').map(s => s.trim()).filter(Boolean)
+const BODY_LIMIT = process.env.BODY_LIMIT || '64kb'
+const RATE_WINDOW = Number(process.env.RATE_LIMIT_WINDOW_MS || 60000)
+const RATE_MAX = Number(process.env.RATE_LIMIT_MAX || 60)
+const MSG_MAX_LEN = Number(process.env.MSG_MAX_LEN || 500)
+const MSG_MIN_INTERVAL = Number(process.env.MSG_MIN_INTERVAL_MS || 750)
+const cspConnect = (process.env.CSP_CONNECT || 'http://localhost:5173 ws://localhost:3001').split(/\s+/)
+
+function corsOrigin(origin, cb) {
+  if (!origin) return cb(null, true)
+  if (ALLOWLIST.indexOf(origin) !== -1) return cb(null, true)
+  return cb(new Error('CORS not allowed'), false)
+}
+
+app.set('x-powered-by', false)
+app.use(hpp())
+app.use(compression())
+app.use(express.json({ limit: BODY_LIMIT }))
+app.use(express.text({ limit: BODY_LIMIT, type: 'text/*' }))
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: true,
+    directives: {
+      defaultSrc: [(process.env.CSP_DEFAULT || '\'self\'')],
+      connectSrc: [(process.env.CSP_DEFAULT || '\'self\'')].concat(cspConnect),
+      scriptSrc: [(process.env.CSP_DEFAULT || '\'self\'')],
+      imgSrc: [(process.env.CSP_DEFAULT || '\'self\'')].concat(['data:']),
+      styleSrc: [(process.env.CSP_DEFAULT || '\'self\'')].concat(['unsafe-inline'])
+    }
+  },
+  crossOriginEmbedderPolicy: false
+}))
+app.use(cors({ origin: corsOrigin, credentials: false }))
+const limiter = rateLimit({ windowMs: RATE_WINDOW, max: RATE_MAX, standardHeaders: true, legacyHeaders: false })
+app.use(limiter)
+
+app.get('/health', (_req, res) => res.json({ ok: true, ts: Date.now() }))
+
+// Auth
+app.post('/auth/register-parent', registerParent)
+app.post('/auth/login', login)
+app.get('/me', requireAuth, me)
+
+// Profiles and parental controls
+app.post('/profiles/child', requireAuth, requireRole('parent'), createChild)
+app.get('/profiles/child', requireAuth, requireRole('parent'), listChildren)
+app.post('/contacts/whitelist', requireAuth, requireRole('parent'), addWhitelist)
+
+// Socket.IO with throttling and sanitization
+const server = http.createServer(app)
+const io = require('socket.io')(server, { cors: { origin: corsOrigin, methods: ['GET','POST'] } })
+io.on('connection', (socket) => {
+  socket.data.lastMsg = 0
+  socket.on('chat:message', (msg) => {
+    const now = Date.now()
+    if (now - (socket.data.lastMsg || 0) < MSG_MIN_INTERVAL) return
+    socket.data.lastMsg = now
+    const safe = sanitizeMessage(msg)
+    if (!safe) return
+    socket.broadcast.emit('chat:message', safe)
+  })
+})
+function sanitizeMessage(input) {
+  try {
+    const obj = Object(input) === input ? input : {}
+    const from = String(obj.from || '').slice(0, 50)
+    const text = String(obj.text || '').replace(/\u0000/g, '').slice(0, MSG_MAX_LEN)
+    const ts = Number(obj.ts || Date.now())
+    if (!from || !text) return null
+    return { from, text, ts }
+  } catch (e) { return null }
+}
+
+server.listen(PORT, () => { console.log('KUKUTalk backend listening on http://localhost:' + PORT) })

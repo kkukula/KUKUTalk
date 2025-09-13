@@ -1,0 +1,2 @@
+self.addEventListener('push',function(e){try{var d=e.data?e.data.json():{};var t=d.title||'KUKUTalk';var o={body:d.body||'Notification',data:d};e.waitUntil(self.registration.showNotification(t,o))}catch(err){}});
+self.addEventListener('notificationclick',function(ev){ev.notification.close();ev.waitUntil(self.clients.matchAll({type:'window',includeUncontrolled:true}).then(function(list){for(var i=0;i<list.length;i++){if('focus' in list[i])return list[i].focus()}if(self.clients.openWindow)return self.clients.openWindow('/')}))});

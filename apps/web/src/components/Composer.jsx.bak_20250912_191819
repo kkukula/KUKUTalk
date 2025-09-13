@@ -1,0 +1,15 @@
+import React, { useState } from 'react'
+export default function Composer({ onSend, onLoadHistory, disabled }){
+  const [room, setRoom] = useState('')
+  const [text, setText] = useState('')
+  function send(){ if(!text) return; try{ onSend && onSend(text, room||null) }catch(e){} setText('') }
+  function load(){ try{ onLoadHistory && onLoadHistory(room||null) }catch(e){} }
+  return (
+    <div style={{display:'flex', gap:8, alignItems:'center', marginTop:8}}> 
+      <input value={room} onChange={e=>setRoom(e.target.value)} placeholder='room (optional / required for child)' style={{flex:'0 0 180px', padding:'8px', border:'1px solid #d1d5db', borderRadius:8}} />
+      <input value={text} onChange={e=>setText(e.target.value)} placeholder='Type a message...' style={{flex:1, padding:'8px', border:'1px solid #d1d5db', borderRadius:8}} onKeyDown={e=>{ if(e.key==='Enter'){ send() } }} />
+      <button onClick={load} disabled={disabled} style={{padding:'8px 10px', borderRadius:8}}>Load</button>
+      <button onClick={send} disabled={disabled} style={{padding:'8px 10px', borderRadius:8}}>Send</button>
+    </div>
+  )
+}

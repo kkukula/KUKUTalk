@@ -1,0 +1,28 @@
+import React from 'react'
+import MessageList from './components/MessageList.jsx'
+import Composer from './components/Composer.jsx'
+import AuthPanel from './components/AuthPanel.jsx'
+import { useSocket } from './hooks/useSocket.js'
+import { useAuth } from './hooks/useAuth.js'
+
+export default function App() {
+  const { user, setUser, logout } = useAuth()
+  const { connected, sendMessage, messages, system } = useSocket(user)
+
+  return (
+    <div style={{fontFamily:'system-ui, Arial', maxWidth: 900, margin: '20px auto'}}>
+      <h1>KUKUTalk</h1>
+      <div style={{marginBottom:10}}>
+        Socket: {connected ? 'online' : 'offline'} | User: {(user && user.name) || 'DemoUser'}
+        {user && user.token ? <button onClick={logout} style={{marginLeft:8, padding:'4px 8px'}}>Logout</button> : null}
+      </div>
+
+      {!user || !user.token ? (
+        <AuthPanel onAuth={setUser} />
+      ) : null}
+
+      <MessageList items={messages} me={(user && user.name) || 'DemoUser'} system={system} />
+      <Composer onSend={sendMessage} disabled={!connected} />
+    </div>
+  )
+}

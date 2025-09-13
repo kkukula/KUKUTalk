@@ -1,0 +1,16 @@
+self.addEventListener('push', function(e){
+  try {
+    const data = e.data ? e.data.json() : {}
+    const title = data.title || 'KUKUTalk'
+    const body = data.body || 'Notification'
+    const options = { body, icon: undefined, data }
+    e.waitUntil(self.registration.showNotification(title, options))
+  } catch(err) {}
+})
+self.addEventListener('notificationclick', function(event){
+  event.notification.close()
+  event.waitUntil(self.clients.matchAll({ type:'window', includeUncontrolled:true }).then(list=>{
+    for (const c of list) { if ('focus' in c) return c.focus() }
+    if (self.clients.openWindow) return self.clients.openWindow('/')
+  }))
+})

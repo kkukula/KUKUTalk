@@ -1,0 +1,28 @@
+# KUKUTalk Security Notes
+
+- Helmet enabled with basic CSP for local dev.
+- Rate limit per IP: window RATE_LIMIT_WINDOW_MS, max RATE_LIMIT_MAX.
+- Body limit: BODY_LIMIT.
+- CORS strict allowlist from CORS_ALLOWLIST (fallback CORS_ORIGIN).
+- Message validation: length cap MSG_MAX_LEN, throttling per socket MSG_MIN_INTERVAL_MS.
+- HPP protection and compression enabled.
+- No PII stored in logs. Audit minimal.
+
+Tune values in .env.
+
+Stage 5:
+- Prometheus metrics at /metrics (bearer token optional).
+- HTTP logging without PII, default metrics enabled.
+- Socket metrics: connections, acks, blocks.
+- Health endpoint includes uptime and version.
+
+Stage 6:
+- Secure attachments MVP: POST /upload (auth), magic-bytes type check and SHA-256, size and mime whitelist.
+- Files stored under data/uploads with metadata in uploads-index.json.
+- GET /files/:id (auth) serves only clean files.
+
+Stage 7:
+- Parent dashboard (stats, whitelist editor, children list).
+- Append-only audit log with endpoints GET /audit and /audit.csv (parent only).
+- Socket/whitelist/upload events recorded.
+

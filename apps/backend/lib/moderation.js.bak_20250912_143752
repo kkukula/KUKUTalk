@@ -1,0 +1,87 @@
+const fs = require('fs')
+const path = require('path')
+const MOD_PATH = path.join(__dirname, '..', 'data', 'mod.json')
+const BAD_PATH = path.join(__dirname, '..', 'data', 'badwords.txt')
+
+function loadMod(){
+  try { return JSON.parse(fs.readFileSync(MOD_PATH, 'utf8')) } catch(e){ return { version:1, whitelist:[], counters:{} } }
+}
+function saveMod(obj){
+  const tmp = MOD_PATH + '.tmp'
+  fs.writeFileSync(tmp, JSON.stringify(obj, null, 2), 'utf8')
+  fs.renameSync(tmp, MOD_PATH)
+}
+function loadBadwords(){
+  try {
+    const t = fs.readFileSync(BAD_PATH, 'utf8')
+    return t.split(/\r?\n/).map(s=>s.trim()).filter(Boolean)
+  } catch(e) { return [] }
+}
+function hasBadWords(text, list){
+  if (!text) return false
+  const t = String(text).toLowerCase()
+  return list.some(w => t.indexOf(w.toLowerCase()) !== -1)
+}
+function extractUrls(text){
+  if (!text) return []
+  const re = /\b((https?:\/\/)?([a-z0-9-]+\.)+[a-z]{2,})(\/\S*)?/ig
+  const m = []
+  let r
+  while ((r = re.exec(text)) !== null) { m.push(r[1]) }
+  return m
+}
+function domainFrom(u){
+  try {
+    if (!/^https?:\/\//i.test(u)) u = 'http://' + u
+    const d = new URL(u).hostname.toLowerCase()
+    return d
+  } catch(e){ return '' }
+}
+function isAllowedLink(u, whitelist){
+  const d = domainFrom(u)
+  return whitelist.some(w => d.endsWith(String(w).toLowerCase()))
+}
+function evaluate(text, cfg, state){
+  const bad = loadBadwords()
+  const mod = loadMod()
+  const wl = Array.isArray(mod.whitelist) ? mod.whitelist : []
+
+  if (hasBadWords(text, bad)) { return { ok:false, reason:'bad_words' } }
+
+  const urls = extractUrls(text)
+  if (urls.length > Number(cfg.maxLinksPerMsg)) { return { ok:false, reason:'too_many_links' } }
+  for (const u of urls) {
+    if (!isAllowedLink(u, wl)) return { ok:false, reason:'link_block' }
+  }
+  if (state.mutedUntil && Date.now() < state.mutedUntil) return { ok:false, reason:'muted' }
+
+  return { ok:true }
+}
+function recordViolation(id, cfg){
+  const mod = loadMod()
+  const c = mod.counters[id] || { violations:0, mutedUntil:0 }
+  c.violations += 1
+  if (c.violations >= Number(cfg.violationsBeforeMute)) {
+    c.mutedUntil = Date.now() + Number(cfg.muteMs)
+    c.violations = 0
+  }
+  mod.counters[id] = c
+  saveMod(mod)
+  return c
+}
+function getState(id){
+  const mod = loadMod()
+  return mod.counters[id] || { violations:0, mutedUntil:0 }
+}
+function clearState(id){
+  const mod = loadMod()
+  delete mod.counters[id]
+  saveMod(mod)
+}
+function getWhitelist(){ return (loadMod().whitelist)||[] }
+function setWhitelist(arr){ const mod = loadMod(); mod.whitelist = arr||[]; saveMod(mod); return mod.whitelist }
+
+module.exports = {
+  evaluate, recordViolation, getState, clearState,
+  getWhitelist, setWhitelist
+}

@@ -1,0 +1,41 @@
+import React, { useState } from 'react'
+import MessageList from './components/MessageList.jsx'
+import Composer from './components/Composer.jsx'
+import AuthPanel from './components/AuthPanel.jsx'
+import ParentDashboard from './components/ParentDashboard.jsx'
+import E2EPanel from './components/E2EPanel.jsx'
+import { useSocket } from './hooks/useSocket'
+import { useAuth } from './hooks/useAuth.js'
+
+export default function App() {
+  const { user, setUser, logout } = useAuth()
+  const [e2e, setE2E] = useState({ enabled:false, pass:'' })
+  const { connected, sendMessage, messages, system, loadHistory } = useSocket(user, e2e)
+  const isParent = !!(user && user.token && (!user.roles || user.roles.indexOf('parent')!==-1))
+
+  return (
+    <div style={{fontFamily:'system-ui, Arial', maxWidth: 980, margin: '20px auto', padding:'0 12px'}}>
+      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:10}}>
+        <h1 style={{margin:0}}>KUKUTalk</h1>
+        <div style={{fontSize:14}}>
+          <span style={{marginRight:8}}>Socket: {connected ? 'online' : 'offline'}</span>
+          <span style={{marginRight:8}}>User: {(user && user.name) || 'DemoUser'} | Roles: {(user && user.roles && user.roles.join(', ')) || 'guest'}</span>
+          {user && user.token ? <button onClick={logout} style={{padding:'6px 10px', borderRadius:8}}>Logout</button> : null}
+        </div>
+      </div>
+
+      {!user || !user.token ? (<AuthPanel onAuth={setUser} />) : null}
+
+      <E2EPanel onChange={setE2E} />
+
+      {isParent ? <ParentDashboard token={user.token} /> : null}
+
+      <MessageList items={messages} me={(user && user.name) || 'DemoUser'} system={system} />
+      <Composer onSend={sendMessage} onLoadHistory={loadHistory} disabled={!connected} />
+    </div>
+  )
+}
+
+
+
+

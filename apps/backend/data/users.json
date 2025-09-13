@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "users": [
+    {
+      "id": "28d5da07-661c-46c6-986e-ebadcc7de9f7",
+      "email": "parent+1757679261504@example.com",
+      "pwd": "$2a$10$q0SaFjvob.h.KClU.N1Gr.3nIo2BdmCAes286nNuyXlWf9OnX8Aom",
+      "roles": [
+        "parent"
+      ],
+      "children": [
+        "3682d7bf-f155-4efc-a026-727cb1d13322"
+      ],
+      "createdAt": 1757679261731,
+      "whitelist": [
+        "family_friend@example.com"
+      ]
+    },
+    {
+      "id": "959248f5-e591-46a1-a9e9-8c9f514a48d4",
+      "email": "teacher1",
+      "pwd": "$2a$10$DmWLeGjxNYSE102PC.wFeeDJ41NPsPPE2KwfeVZgdVCU5Q.jZ0W6a",
+      "roles": [
+        "parent"
+      ],
+      "children": [],
+      "createdAt": 1757679653902,
+      "whitelist": []
+    },
+    {
+      "id": "7c4c64af-3e42-4f34-803a-5b6d92bb6ec4",
+      "email": "kid1",
+      "pwd": "$2a$10$XnuiiR40pIwJXsoPsGUbFu5anW/nOCD6n52PHOw0eUBgaV.rGGhG2",
+      "roles": [
+        "parent"
+      ],
+      "children": [],
+      "createdAt": 1757681945102,
+      "whitelist": []
+    }
+  ],
+  "children": [
+    {
+      "id": "3682d7bf-f155-4efc-a026-727cb1d13322",
+      "parentId": "28d5da07-661c-46c6-986e-ebadcc7de9f7",
+      "name": "Kiddo",
+      "createdAt": 1757679261875
+    }
+  ],
+  "controls": {
+    "schedules": {
+      "3682d7bf-f155-4efc-a026-727cb1d13322": []
+    },
+    "requests": []
+  }
+}

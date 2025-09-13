@@ -1,0 +1,39 @@
+import { useEffect, useRef, useState } from 'react'
+import { io } from 'socket.io-client'
+
+export function useSocket(user) {
+  const [connected, setConnected] = useState(false)
+  const [messages, setMessages] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kukutalk_messages')||'[]') } catch(e){ return [] }
+  })
+  const socketRef = useRef(null)
+
+  useEffect(() => {
+    const url = (import.meta && import.meta.env && import.meta.env.VITE_API_URL) || 'http://localhost:3001'
+    const s = io(url, { transports: ['websocket', 'polling'] })
+    socketRef.current = s
+    s.on('connect', () => setConnected(true))
+    s.on('disconnect', () => setConnected(false))
+    s.on('chat:message', (msg) => {
+      setMessages(prev => {
+        const next = prev.concat([msg])
+        try { localStorage.setItem('kukutalk_messages', JSON.stringify(next)) } catch(e){}
+        return next
+      })
+    })
+    return () => { s.close() }
+  }, [])
+
+  const sendMessage = (text) => {
+    if (!socketRef.current || !text) return
+    const payload = { from: user.name, text: String(text), ts: Date.now() }
+    socketRef.current.emit('chat:message', payload)
+    setMessages(prev => {
+      const next = prev.concat([payload])
+      try { localStorage.setItem('kukutalk_messages', JSON.stringify(next)) } catch(e){}
+      return next
+    })
+  }
+
+  return { connected, messages, sendMessage }
+}

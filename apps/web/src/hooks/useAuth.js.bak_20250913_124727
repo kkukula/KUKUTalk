@@ -1,0 +1,19 @@
+const base = import.meta.env.VITE_API_URL || 'http://localhost:3001'
+import { useState, useEffect, useCallback } from 'react'
+
+export function useAuth() {
+  const [user, setUser] = useState(()=> {
+    try {
+      const token = localStorage.getItem('kukutalk_token') || ''
+      const name = localStorage.getItem('kukutalk_name') || 'DemoUser'
+      return token ? { name, token, roles:['parent'] } : { name, token:'' }
+    } catch(e){ return { name:'DemoUser', token:'' } }
+  })
+  const loginAs = useCallback((u)=> setUser(u), [])
+  const logout = useCallback(()=> {
+    try { localStorage.removeItem('kukutalk_token') } catch(e){}
+    setUser(prev => ({ name: prev.name || 'DemoUser', token:'' }))
+  }, [])
+  useEffect(()=> { try { if(user && user.name) localStorage.setItem('kukutalk_name', user.name) } catch(e){} }, [user && user.name])
+  return { user, setUser: loginAs, logout }
+}

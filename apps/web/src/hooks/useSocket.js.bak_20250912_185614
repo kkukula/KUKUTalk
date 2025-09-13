@@ -1,0 +1,54 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import io from 'socket.io-client'
+import { encryptMessage, decryptMessage, isE2EText } from '../lib/e2e'
+
+export function useSocket(user, e2e){
+  const [connected, setConnected] = useState(false)
+  const [messages, setMessages] = useState([])
+  const [system, setSystem] = useState(null)
+  const socketRef = useRef(null)
+
+  const url = useMemo(()=> (import.meta.env.VITE_API_URL || 'http://localhost:3001'), [])
+  const auth = useMemo(()=> (user && user.token) ? { token: user.token } : {}, [user])
+
+  useEffect(()=>{
+    const s = io(url, { auth })
+    socketRef.current = s
+    s.on('connect', ()=> setConnected(true))
+    s.on('disconnect', ()=> setConnected(false))
+    s.on('system:block', (p)=> setSystem({ type:'block', payload:p }))
+    s.on('system:ack', ()=> setSystem(null))
+    s.on('chat:message', async (m) => {
+      let txt = m.text
+      if (isE2EText(txt) && e2e && e2e.enabled && e2e.pass){
+        const dec = await decryptMessage(txt, e2e.pass, m.room || '')
+        txt = dec || '[locked]'
+      }
+      setMessages(prev => prev.concat([{ from: m.from, text: txt, ts: m.ts, room: m.room }]))
+    })
+    return ()=>{ try { s.close() } catch(e){} }
+  }, [url, auth, e2e && e2e.enabled, e2e && e2e.pass])
+
+  async function sendMessage(text, room){
+    if (!socketRef.current) return
+    const from = (user && user.name) || 'DemoUser'
+    const ts = Date.now()
+    let toSend = String(text||'')
+    let payload = { from, text: toSend, ts }
+    if (room) payload.room = room
+    if (e2e && e2e.enabled && e2e.pass){ try { payload.text = await encryptMessage(payload.text, e2e.pass, room || '') } catch(e){} }
+    // optimistic add
+    setMessages(prev => prev.concat([{ from, text: toSend, ts, room }])) // optimistic
+    socketRef.current.emit('chat:message', payload)
+  }
+    if (room) payload.room = room
+    if (e2e && e2e.enabled && e2e.pass){
+      try { payload.text = await encryptMessage(payload.text, e2e.pass, room || '') } catch(e){}
+    }
+    socketRef.current.emit('chat:message', payload)
+  }
+
+  return { connected, sendMessage, messages, system }
+}
+
+

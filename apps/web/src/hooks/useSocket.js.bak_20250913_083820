@@ -1,0 +1,82 @@
+import { useEffect, useRef, useState } from "react"
+import io from "socket.io-client"
+
+const base = import.meta.env.VITE_API_URL || "http://localhost:3001"
+
+async function getJson(path, token){
+  const h = { "Content-Type":"application/json" }
+  if (token) h["Authorization"] = "Bearer " + token
+  const r = await fetch(base + path, { headers: h })
+  if(!r.ok) throw new Error("http "+r.status)
+  return await r.json()
+}
+
+export default function useSocket(user, e2e, token){
+  const [connected, setConnected] = useState(false)
+  const [messages, setMessages]   = useState([])
+  const [system, setSystem]       = useState({ last:"", mutedUntil:0 })
+  const sockRef = useRef(null)
+
+  const name = (user && (user.name || user.email)) || "User"
+
+  useEffect(() => {
+    const url = base.replace(/^http/,"ws")
+    const s = io(url, { auth: token ? { token } : {} })
+    sockRef.current = s
+
+    s.on("connect", () => setConnected(true))
+    s.on("disconnect", () => setConnected(false))
+    s.on("chat:message", (m) => setMessages(prev => prev.concat([m])))
+    s.on("system:block", (p) => {
+      setSystem({ last: p && p.reason || "blocked", mutedUntil: p && p.mutedUntil || 0 })
+    })
+    s.on("system:ack", () => {})
+
+    return () => { try{ s.close() }catch(_e){} }
+  }, [token])
+
+  function sanitizeRoom(r){ return r ? String(r).slice(0,100) : null }
+
+  async function loadHistory(room, limit, dir, cursor){
+    const q = []
+    if(room){ q.push("room="+encodeURIComponent(room)) }
+    if(limit){ q.push("limit="+encodeURIComponent(limit)) } else { q.push("limit=100") }
+    if(dir){ q.push("dir="+encodeURIComponent(dir)) }
+    if(cursor){ q.push("cursor="+encodeURIComponent(cursor)) }
+    const res = await getJson("/chat/history"+(q.length?"?"+q.join("&"):""), token)
+    const items = Array.isArray(res && res.items) ? res.items : []
+    setMessages(items)
+    return items
+  }
+
+  async function loadOlder(room){
+    const rm = sanitizeRoom(room)
+    const items = messages || []
+    let cursor = null
+    if(items.length){ cursor = Math.min.apply(null, items.map(x => Number(x.ts||0))) }
+    const older = await loadHistory(rm, 50, "older", cursor)
+    // prepend older if backend returns older first
+    setMessages(prev => (older||[]).concat(prev||[]))
+    return older
+  }
+
+  function sendMessage(text, room){
+    const s = sockRef.current
+    if(!s) return
+    const payload = { from: String(name), text: String(text||""), ts: Date.now() }
+    const rm = sanitizeRoom(room)
+    if(rm){ payload.room = rm }
+    s.emit("chat:message", payload)
+  }
+
+  // pomoc dla frontu bez propsow
+  try {
+    if (typeof window !== "undefined") {
+      window.__useSock = {
+        sendMessage, loadHistory, loadOlder, messages
+      }
+    }
+  } catch(_e){}
+
+  return { connected, sendMessage, messages, system, loadHistory, loadOlder }
+}
