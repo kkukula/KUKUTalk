@@ -1,6 +1,7 @@
 name: CI/CD
 
 on:
+  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
@@ -77,3 +78,4 @@ jobs:
             docker login "$REGISTRY" -u "${{ github.repository_owner }}" -p "${{ secrets.GITHUB_TOKEN }}"
             docker compose -f docker-compose.staging.yml pull
             docker compose -f docker-compose.staging.yml up -d
+
