@@ -1,10 +1,10 @@
 name: CI/CD
 
 on:
-  workflow_dispatch:
   push:
     branches: [ main ]
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -12,8 +12,8 @@ permissions:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_BACKEND: ${{ github.repository_owner }}/${{ github.event.repository.name }}-backend
-  IMAGE_WEB: ${{ github.repository_owner }}/${{ github.event.repository.name }}-web
+  IMAGE_BACKEND: ${{ github.repository_owner }}/kukutalk-backend
+  IMAGE_WEB: ${{ github.repository_owner }}/kukutalk-web}
 
 jobs:
   build-and-push:
@@ -71,12 +71,8 @@ jobs:
           key: ${{ secrets.STAGING_SSH_KEY }}
           script: |
             set -e
-            cd "${{ secrets.STAGING_PATH }}"
-            export REGISTRY="${{ env.REGISTRY }}"
-            export IMAGE_BACKEND="${{ github.repository_owner }}/${{ github.event.repository.name }}-backend"
-            export IMAGE_WEB="${{ github.repository_owner }}/${{ github.event.repository.name }}-web"
-            docker login "$REGISTRY" -u "${{ github.repository_owner }}" -p "${{ secrets.GITHUB_TOKEN }}"
+            cd ${{ secrets.STAGING_PATH }}
+            echo "Logging in to GHCR…"
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             docker compose -f docker-compose.staging.yml pull
             docker compose -f docker-compose.staging.yml up -d
-
-
